@@ -21,7 +21,7 @@ public class LPR {
     private int port = 515;
     private String user = "nobody";
 
-    private Vector jobs = new Vector();
+    private List<String> jobs = new ArrayList<String>();
 
     private String hostname = null;
     private String jobname = "";
@@ -355,7 +355,7 @@ public class LPR {
 
         LineNumberReader lnr = new LineNumberReader(new InputStreamReader(in));
 
-        String line = in.readLine();
+        String line = lnr.readLine();
 
         close(printer, in, out);
 
@@ -600,12 +600,12 @@ public class LPR {
     return data;
   }
 
-  private String fillRight(String data, int size, String filler) {
-    while (data.length() < size) {
-      data += filler;
-    }
-    return data;
-  }
+//  private String fillRight(String data, int size, String filler) {
+//    while (data.length() < size) {
+//      data += filler;
+//    }
+//    return data;
+//  }
 
   /********************* Job *************************/
   private class PrintJob extends Thread {
@@ -626,7 +626,7 @@ public class LPR {
 
         this.id = getNewJobId();
 
-        jobs.addElement(id);
+        jobs.add(id);
     }
 
     public PrintJob(String queue, char[] data, String document) {
@@ -638,7 +638,7 @@ public class LPR {
 
         this.id = getNewJobId();
 
-        jobs.addElement(id);
+        jobs.add(id);
     }
 
     public void run() {
@@ -648,7 +648,7 @@ public class LPR {
       } catch (Exception e) {
         System.out.println(e.getMessage());
       }
-        jobs.removeElement(id);
+        jobs.remove(id);
       if (rc) {
         System.out.println("Job " + id + " allready printed and removed from queue");
       } else {

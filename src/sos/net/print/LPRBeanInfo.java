@@ -11,7 +11,7 @@ package sos.net.print;
 import java.beans.*;
 
 public class LPRBeanInfo extends SimpleBeanInfo {
-  Class beanClass = LPR.class;
+  Class<LPR> beanClass = LPR.class;
   String iconColor16x16Filename = "lpr16c.gif";
   String iconColor32x32Filename = "lpr32c.gif";
   String iconMono16x16Filename = "lpr16m.gif";

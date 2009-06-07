@@ -1,19 +1,13 @@
 package org.cscs.jprinterface.lpd;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
-
-import com.sun.tools.javac.tree.Tree.Case;
-
-import sun.tools.tree.ThisExpression;
 
 public class RequestHandler implements Runnable {
 	private static final Logger logger = Logger.getLogger(RequestHandler.class.getName());
@@ -65,8 +59,8 @@ public class RequestHandler implements Runnable {
 			    //  abort-job = %x1 LF
 				//  receive-control-file = %x2 number-of-bytes SP name-of-control-file LF
 				//  receive-data-file = %x03 number-of-bytes SP name-of-data-file LF
-				int submoode = in.read();
-				
+				int submode = in.read();
+				logger.info(String.format("recieve job submode %d", submode));
 				
 				break;
 			case queueStatus:

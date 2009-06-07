@@ -12,12 +12,12 @@ import java.awt.*;
 import java.awt.event.*;
 
 import java.io.*;
-import sos.net.print.*;
 
 
 public class LPRProg extends Frame {
+	private static final long serialVersionUID = 1L;
 
-  LPR lpr = null;
+LPR lpr = null;
 
   String[] filetypes = {"Formatted", "No Filter", "Page Numbers", "Postscript"};
 
@@ -56,7 +56,7 @@ public class LPRProg extends Frame {
     }
 
     for (int i=0; i<filetypes.length; i++) {
-      filetypeList.addItem(filetypes[i]);
+      filetypeList.add(filetypes[i]);
     }
     filetypeList.select(1);
 
@@ -64,7 +64,7 @@ public class LPRProg extends Frame {
   }
 
   public static void main(String[] args) {
-    LPRProg prog = new LPRProg();
+     new LPRProg();
   }
 
   private void jbInit() throws Exception {
@@ -186,7 +186,7 @@ public class LPRProg extends Frame {
   void printBtn_actionPerformed(ActionEvent e) {
     FileDialog dlg = new FileDialog(this, "Select file to print", FileDialog.LOAD);
 
-    dlg.show();
+    dlg.setVisible(true);
 
     if (dlg.getFile()!=null) {
 
@@ -208,7 +208,7 @@ public class LPRProg extends Frame {
 
           lpr.print(textQueue.getText(), file, dlg.getFile());
 
-          listState.addItem(file.getName() + " on " + textQueue.getText() + "@" + textHost.getText() + " printed");
+          listState.add(file.getName() + " on " + textQueue.getText() + "@" + textHost.getText() + " printed");
 
         } catch (Exception e1) {
           e1.printStackTrace();
@@ -236,7 +236,7 @@ public class LPRProg extends Frame {
   }
 
   void stateBtn_actionPerformed(ActionEvent e) {
-    listState.addItem(lpr.getQueueState(textQueue.getText(), false));
+    listState.add(lpr.getQueueState(textQueue.getText(), false));
   }
   
 }
