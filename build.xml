@@ -27,7 +27,12 @@
     <mkdir dir="${dist}/lib"/>
 
     <!-- Put everything in ${build} into the MyProject-${DSTAMP}.jar file -->
-    <jar jarfile="${dist}/lib/${ant.project.name}}-${DSTAMP}.jar" basedir="${build}"/>
+    <jar jarfile="${dist}/lib/${ant.project.name}-${DSTAMP}.jar" basedir="${build}">
+    	<manifest>
+   		    <attribute name="Built-By" value="${user.name}"/>
+   		    <attribute name="Main-Class" value="org.cscs.jprinterface.lpd.LinePrinterDemonServer"/>
+    	</manifest>	
+    </jar>
   </target>
 
   <target name="clean"
