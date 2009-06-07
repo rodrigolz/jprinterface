@@ -55,10 +55,12 @@ public class RequestHandler implements Runnable {
 			case recvJob:
 			    // receive-job = %x02 printer-name LF
 				queue = readQueue(in);
+				logger.info(String.format("   recv queue: %s", queue));
 				// now read a sub-command, one of
 			    //  abort-job = %x1 LF
 				//  receive-control-file = %x2 number-of-bytes SP name-of-control-file LF
 				//  receive-data-file = %x03 number-of-bytes SP name-of-data-file LF
+				
 				int submode = in.read();
 				logger.info(String.format("recieve job submode %d", submode));
 				
