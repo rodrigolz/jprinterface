@@ -122,9 +122,11 @@ public class RequestHandler implements Runnable {
 					}
 				}
 				
+				logger.info(String.format(" Job recieve completed, putting on queue"));
+
 				PrintJob jb = jobBuilder.build();
 				server.getQueue(queue).add(jb);
-				
+				break;
 			case queueStatus:
 			case queueStatusVerbose:
 				// send-queue-short = %x03 printer-name *(SP(user-name / job-number)) LF
@@ -164,6 +166,9 @@ public class RequestHandler implements Runnable {
 			}
 			
 		}
+		
+		logger.info(String.format("request handler completed"));
+
 		
 
 	}
