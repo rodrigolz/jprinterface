@@ -60,7 +60,7 @@ public class RequestHandler implements Runnable {
 			    //  abort-job = %x1 LF
 				//  receive-control-file = %x2 number-of-bytes SP name-of-control-file LF
 				//  receive-data-file = %x03 number-of-bytes SP name-of-data-file LF
-				
+				out.append((char) 0x00);
 				int submode = in.read();
 				logger.info(String.format("recieve job submode %d", submode));
 				
