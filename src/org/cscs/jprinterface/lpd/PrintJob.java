@@ -24,6 +24,8 @@ public class PrintJob {
 		}
 		public JobBuilder addControlFile(String name, byte[] data) {
 			this.control.put(name, data);
+			
+			System.out.println(new String(data));
 			return this;
 		}
 		public JobBuilder addDataFile(String name, byte[] data) {
