@@ -6,6 +6,7 @@ import java.net.Socket;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
@@ -71,6 +72,11 @@ public class LinePrinterDemonServer implements Server {
 		
 		Server lpd = new LinePrinterDemonServer();
 		lpd.addPrinterQueue("test");
+		
+		Map<String, byte[]> files = new HashMap<String,byte[]>();
+		files.put("phonebook", new byte[500]);
+		PrintJob pj = new PrintJob(new HashMap<String,byte[]>(), files, "chris", 990, 1, "desk01");
+		lpd.getQueue("test").add(pj);
 		lpd.start();
 		
 	}

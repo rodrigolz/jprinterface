@@ -64,7 +64,10 @@ public class RequestHandler implements Runnable {
 				
 				break;
 			case queueStatus:
-				// send-queue-short  = %x03 printer-name *(SP(user-name / job-number)) LF
+			case queueStatusVerbose:
+				// send-queue-short = %x03 printer-name *(SP(user-name / job-number)) LF
+				// send-queue-long  = %x04 printer-name *(SP(user-name / job-number)) LF
+
 				StringBuilder queueName = new StringBuilder();
 				StringBuilder filter = new StringBuilder();
 				StringBuilder reading = queueName;
@@ -76,54 +79,18 @@ public class RequestHandler implements Runnable {
 						reading.append((char)buf);
 					}
 				}
-				
-			/*
-			 *  For an printer with no jobs, the response starts in column 1 and is:
-			      no entries
-			
-			   For a printer with jobs, an example of the response is:
-			     killtree is ready and printing
-			     Rank   Owner      Job          Files             Total Size
-			     active fred       123          stuff             1204 bytes
-			     1st    smith      124          resume, foo       34576 bytes
-			     2nd    fred       125          more              99 bytes
-			     3rd    mary       126          mydoc             378 bytes
-			     4th    jones      127          statistics.ps     4567 bytes
-			     5th    fred       128          data.txt          9 bytes
-			
-			   The column numbers of above headings and job entries are:
-			     |      |          |            |                 |
-			     01     08         19           35                63
-			 */
-
 				queue = queueName.toString();
 				List<PrintJob> jobs = server.getQueue(queue);
-				if (jobs == null || jobs.size() == 0) {
-					out.println("no entries");
+				if (c == Command.queueStatus) {
+					renderQueueStatus(out, queue, jobs);			
 				} else {
-					out.println(String.format("%s is ready and printing\n", queue));
-					out.println(String.format("%7s%11s%13s%18s%12s\n", "Rank", "Owner", "Job","Files","Total Size"));
-					int rank = 0;
-					for (PrintJob job: jobs) {
-						int bytecount = 0;
-						StringBuilder sb = new StringBuilder();
-						for (Map.Entry<String,byte[]> entry: job.data.entrySet()) {
-							sb.append( bytecount == 0 ? "" : ", ").append(entry.getKey());
-							bytecount += entry.getValue().length;
-						}
-						sb.setLength(18);
-						out.println(String.format("%7s%11s%13d%18s%12d\n", 
-								rank == 0 ? "active" : Integer.toString(rank), 
-								job.owner, 
-								job.id,
-								sb.toString(),
-								bytecount * job.copies
-							));
-					}
-				}			
-			
+					renderQueueVerboseStatus(out, queue, jobs);
+				}	
 			}
-
+			
+			out.close();
+			in.close();
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 		} finally {
@@ -139,6 +106,106 @@ public class RequestHandler implements Runnable {
 
 	}
 
+	public static void renderQueueVerboseStatus(PrintWriter out, String queue, List<PrintJob> jobs) {
+		/*
+		 * For an printer with no jobs the response is:
+		 *      no entries
+		 *
+		 *   For a printer with jobs, an example of the response is:
+		 *      killtree is ready and printing
+		 * 
+		 *      fred: active                        [job 123 tiger]
+		 *              2 copies of stuff           602 bytes
+		 *
+		 *      smith: 1st                          [job 124 snail]
+		 *              2 copies of resume          7088 bytes
+		 *              2 copies of foo             10200 bytes
+		 *
+		 *      fred: 2nd                           [job 125 tiger]
+		 *              more                        99 bytes
+		 *
+		 *      The column numbers of above headings and job entries are:
+		 *      |       |                           |
+		 *      01      09                          41
+		 * 
+		 */
+		
+		if (jobs == null || jobs.size() == 0) {
+			out.println("no entries");
+			return;
+		}
+	
+		out.println(String.format("%s is ready and printing\n", queue));
+		// out.println(String.format("%7s%11s%13s%18s%12s\n", "Rank", "Owner", "Job","Files","Total Size"));
+		int rank = 0;
+		for (PrintJob job: jobs) {
+			out.println(String.format("%-41s[job %d %s]", 
+					String.format("%s: %s", job.owner, rank == 0 ? "active" : Integer.toString(rank)), 
+					job.id,
+					job.host
+				));
+			for (Map.Entry<String,byte[]> entry: job.data.entrySet()) {
+				out.println(String.format("%9s%-32s%d bytes",
+						"",
+						String.format("%d copies of %s", job.copies, entry.getKey()),
+						entry.getValue().length
+					));
+			}
+			out.println("");
+		}
+		
+	}
+
+	public static void renderQueueStatus(PrintWriter out, String queue, List<PrintJob> jobs) {
+		/*
+		 *  For an printer with no jobs, the response starts in column 1 and is:
+		      no entries
+		
+		   For a printer with jobs, an example of the response is:
+		     killtree is ready and printing
+		     Rank   Owner      Job          Files             Total Size
+		     active fred       123          stuff             1204 bytes
+		     1st    smith      124          resume, foo       34576 bytes
+		     2nd    fred       125          more              99 bytes
+		     3rd    mary       126          mydoc             378 bytes
+		     4th    jones      127          statistics.ps     4567 bytes
+		     5th    fred       128          data.txt          9 bytes
+		
+		   The column numbers of above headings and job entries are:
+		     |      |          |            |                 |
+		     01     08         19           35                63
+		 */
+
+			if (jobs == null || jobs.size() == 0) {
+				out.println("no entries");
+				return;
+			}
+		
+			out.println(String.format("%s is ready and printing", queue));
+			out.println(String.format("%-7s%-11s%-13s%-18s%-12s", "Rank", "Owner", "Job","Files","Total Size"));
+			int rank = 0;
+			for (PrintJob job: jobs) {
+				int bytecount = 0;
+				StringBuilder sb = new StringBuilder();
+				for (Map.Entry<String,byte[]> entry: job.data.entrySet()) {
+					sb.append( bytecount == 0 ? "" : ", ").append(entry.getKey());
+					bytecount += entry.getValue().length;
+				}
+				sb.setLength(17);
+				out.println(String.format("%-7s%-11s%-13d%-17s %d bytes", 
+						rank == 0 ? "active" : Integer.toString(rank), 
+								job.owner, 
+								job.id,
+								sb.toString(),
+								bytecount * job.copies
+								// String.format("%d bytes", bytecount * job.copies)
+				));
+			}
+
+	}
+
+	
+	
 	private String readQueue(InputStream in) throws IOException {
 		StringBuilder queueName = new StringBuilder();
 		int buf;
