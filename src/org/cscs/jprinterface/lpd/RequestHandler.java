@@ -1,10 +1,12 @@
 package org.cscs.jprinterface.lpd;
 
 import java.io.BufferedInputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.InputMismatchException;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -41,9 +43,9 @@ public class RequestHandler implements Runnable {
 		try {
 		
 			PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
-			InputStream in = new BufferedInputStream(clientSocket.getInputStream());
+			DataInputStream in = new DataInputStream( new BufferedInputStream(clientSocket.getInputStream()));
 			
-			mode = in.read();
+			mode = in.readUnsignedByte();
 			Command c  = Command.values()[mode];
 			logger.info(String.format("Client request: %s", c));
 			String queue;
@@ -60,12 +62,61 @@ public class RequestHandler implements Runnable {
 			    //  abort-job = %x1 LF
 				//  receive-control-file = %x2 number-of-bytes SP name-of-control-file LF
 				//  receive-data-file = %x03 number-of-bytes SP name-of-data-file LF
+				
+				PrintJob.JobBuilder jobBuilder = new PrintJob.JobBuilder();
 				out.append((char) 0x00);
 				out.flush();
-				int submode = in.read();
-				logger.info(String.format("recieve job submode %d", submode));
 				
-				break;
+				while (true) {
+					
+					int submode = in.readUnsignedByte();
+					logger.info(String.format("recieve job submode %d", submode));
+					switch (submode) {
+					case 1: // cancelled
+						break;
+					case 2:
+						// receive-control-file = %x2 number-of-bytes SP name-of-control-file LF
+	
+					case 3:
+						// receive-data-file = %x03 number-of-bytes SP name-of-data-file LF
+						StringBuilder bufByteCount = new StringBuilder();
+						StringBuilder bufFileName = new StringBuilder();
+						StringBuilder bufActive = bufByteCount;
+						int buf;
+						while (0x0A != (buf = in.readUnsignedByte())) {
+							if (buf == 0x20) {
+								bufActive = bufFileName;
+							} else {
+								bufActive.append((char)buf);
+							}
+						}
+						int byteCount = Integer.parseInt(bufByteCount.toString());
+						String fileName = bufFileName.toString();
+						logger.info(String.format("    recieve file '%s' bytes %d", fileName, byteCount));
+						
+						out.append((char) 0x00);
+						out.flush();
+						
+						byte[] buffer = new byte[byteCount];
+						in.readFully(buffer);
+						
+						logger.info(String.format("    recieve completed - file '%s' bytes %d", fileName, byteCount));
+
+						// then expect a zero and reply iwth a zero
+						int check = in.readUnsignedByte();
+						if (check != 0) throw new InputMismatchException("expected zero byte after file");
+						
+						out.append((char) 0x00);
+						out.flush();
+						
+						if (submode == 2 ) jobBuilder.addControlFile(fileName, buffer);
+						if (submode == 3 ) jobBuilder.addDataFile(fileName, buffer);
+						
+						break;
+					
+					}
+				}
+				
 			case queueStatus:
 			case queueStatusVerbose:
 				// send-queue-short = %x03 printer-name *(SP(user-name / job-number)) LF
