@@ -68,8 +68,13 @@ public class RequestHandler implements Runnable {
 				out.flush();
 				
 				while (true) {
-					
-					int submode = in.readUnsignedByte();
+					int submode;
+					try {
+						submode = in.readUnsignedByte();
+					} catch (java.io.EOFException eof) {
+						// legitimate to disconnect here
+						break;
+					}
 					logger.info(String.format("recieve job submode %d", submode));
 					switch (submode) {
 					case 1: // cancelled
@@ -102,7 +107,7 @@ public class RequestHandler implements Runnable {
 						
 						logger.info(String.format("    recieve completed - file '%s' bytes %d", fileName, byteCount));
 
-						// then expect a zero and reply iwth a zero
+						// then expect a zero and reply with a zero
 						int check = in.readUnsignedByte();
 						if (check != 0) throw new InputMismatchException("expected zero byte after file");
 						
@@ -116,6 +121,9 @@ public class RequestHandler implements Runnable {
 					
 					}
 				}
+				
+				PrintJob jb = jobBuilder.build();
+				server.getQueue(queue).add(jb);
 				
 			case queueStatus:
 			case queueStatusVerbose:
