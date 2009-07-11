@@ -48,8 +48,8 @@ public class FilesystemPersistingListener implements QueueListener {
 		}
 		@Override
 		public void run() {			
-			File f = new File(String.format("%s\\%d\\rawjob.serialised", directoryRoot, job.id));
-			f.mkdirs();
+			File f = new File(String.format("%s/%d/rawjob.serialised", directoryRoot, job.id));
+			f.getParentFile().mkdirs();
 			logger.info("Wrote: " + f.getAbsolutePath());	
 			ObjectOutputStream oos;
 			try {
