@@ -3,8 +3,6 @@ package org.cscs.jprinterface.lpd;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
@@ -66,15 +64,5 @@ public class LinePrinterDemonServer implements Server {
 		}
 		
 	}
-	
-	
-	public static void main(String[] args) {
-		
-	
-		
-	}
-
-	
-	
 	
 }
