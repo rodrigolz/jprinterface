@@ -29,12 +29,12 @@ public class RequestHandler implements Runnable {
 		}
 	}
 
-	private Socket clientSocket;
-	private Server server;
+	private final Socket clientSocket;
+	private final QueueManager queue;
 	
-	public RequestHandler(Socket clientSocket, Server server) {
+	public RequestHandler(Socket clientSocket, QueueManager queue) {
 		this.clientSocket = clientSocket;
-		this.server = server;
+		this.queue = queue;
 	}
 
 	public void run() {
@@ -48,22 +48,22 @@ public class RequestHandler implements Runnable {
 			mode = in.readUnsignedByte();
 			Command c  = Command.values()[mode];
 			logger.info(String.format("Client request: %s", c));
-			String queue;
+			String queueName;
 			switch (c) {
 			case print:
 				// print-waiting-jobs = %x01 printer-name LF
-				queue = readQueue(in);
+				queueName = readQueue(in);
 				break;
 			case recvJob:
 			    // receive-job = %x02 printer-name LF
-				queue = readQueue(in);
-				logger.info(String.format("   recv queue: %s", queue));
+				queueName = readQueue(in);
+				logger.info(String.format("   recv queue: %s", queueName));
 				// now read a sub-command, one of
 			    //  abort-job = %x1 LF
 				//  receive-control-file = %x2 number-of-bytes SP name-of-control-file LF
 				//  receive-data-file = %x03 number-of-bytes SP name-of-data-file LF
-				
-				PrintJob.JobBuilder jobBuilder = new PrintJob.JobBuilder();
+				int jobid = queue.getNextJobId();
+				PrintJob.JobBuilder jobBuilder = new PrintJob.JobBuilder(jobid);
 				out.append((char) 0x00);
 				out.flush();
 				
@@ -125,16 +125,16 @@ public class RequestHandler implements Runnable {
 				logger.info(String.format(" Job recieve completed, putting on queue"));
 
 				PrintJob jb = jobBuilder.build();
-				server.getQueue(queue).add(jb);
+				queue.getQueue(queueName).add(jb);
 				break;
 			case queueStatus:
 			case queueStatusVerbose:
 				// send-queue-short = %x03 printer-name *(SP(user-name / job-number)) LF
 				// send-queue-long  = %x04 printer-name *(SP(user-name / job-number)) LF
 
-				StringBuilder queueName = new StringBuilder();
+				StringBuilder queueName2 = new StringBuilder();
 				StringBuilder filter = new StringBuilder();
-				StringBuilder reading = queueName;
+				StringBuilder reading = queueName2;
 				int buf;
 				while (0x0A != (buf = in.read())) {
 					if (buf == 0x20) {
@@ -143,12 +143,12 @@ public class RequestHandler implements Runnable {
 						reading.append((char)buf);
 					}
 				}
-				queue = queueName.toString();
-				List<PrintJob> jobs = server.getQueue(queue);
+				queueName = queueName2.toString();
+				List<PrintJob> jobs = queue.getQueue(queueName);
 				if (c == Command.queueStatus) {
-					renderQueueStatus(out, queue, jobs);			
+					renderQueueStatus(out, queueName, jobs);			
 				} else {
-					renderQueueVerboseStatus(out, queue, jobs);
+					renderQueueVerboseStatus(out, queueName, jobs);
 				}	
 			}
 			

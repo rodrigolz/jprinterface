@@ -30,7 +30,7 @@
     <jar jarfile="${dist}/lib/${ant.project.name}-${DSTAMP}.jar" basedir="${build}">
     	<manifest>
    		    <attribute name="Built-By" value="${user.name}"/>
-   		    <attribute name="Main-Class" value="org.cscs.jprinterface.lpd.LinePrinterDemonServer"/>
+   		    <attribute name="Main-Class" value="org.cscs.jprinterface.Main"/>
     	</manifest>	
     </jar>
   </target>

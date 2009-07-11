@@ -1,5 +1,6 @@
 package org.cscs.jprinterface.lpd;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -10,17 +11,23 @@ import java.util.Map;
  * @author shuckc
  *
  */
-public class PrintJob {
-	
+public class PrintJob implements Serializable {
+	private static final long serialVersionUID = 1L;
+
+	/**
+	 * Build an immutable job starting from only the ID
+	 * @author shuckc
+	 *
+	 */
 	public static class JobBuilder {
 		public final Map<String, byte[]> control = new HashMap<String, byte[]>();
 		public final Map<String, byte[]> data = new HashMap<String, byte[]>();	
-		private int id;
+		private final int id;
 		private int copies;
 		private String host;
 		private String owner;
-		public JobBuilder() {
-		
+		public JobBuilder(int id) {
+			this.id = id;
 		}
 		public JobBuilder addControlFile(String name, byte[] data) {
 			this.control.put(name, data);
@@ -35,7 +42,15 @@ public class PrintJob {
 		public PrintJob build() {
 			return new PrintJob(control, data, owner,id,copies,host);
 		}
-	
+		public void setCopies(int copies) {
+			this.copies = copies;
+		}
+		public void setOwner(String owner) {
+			this.owner = owner;
+		}
+		public void setHost(String host) {
+			this.host = host;
+		}		
 	}
 
 	public final Map<String, byte[]> control;

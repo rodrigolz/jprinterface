@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,7 +25,13 @@ public class LinePrinterDemonServer implements Server {
 	private ServerSocket serverSocket;
 	private ExecutorService executor = Executors.newSingleThreadExecutor();
 	private volatile boolean running = true;
-	private HashMap<String, List<PrintJob>> printQueues = new HashMap<String, List<PrintJob>>();
+	
+	private QueueManager queue;
+
+	@Override
+	public void setQueueManager(QueueManager queue) {
+		this.queue = queue;		
+	}
 	
 	public void start() {
 		
@@ -37,7 +41,7 @@ public class LinePrinterDemonServer implements Server {
 		    System.out.println("Could not listen on port");
 		    System.exit(-1);
 		}
-		logger.info(String.format("Listening on %d, printqueues %s", port, printQueues));
+		logger.info(String.format("Listening on %d, printqueues %s", port, queue.getQueues()));
 		
 		while (running ) {
 			
@@ -46,7 +50,7 @@ public class LinePrinterDemonServer implements Server {
 			try {
 			    clientSocket = serverSocket.accept();
 				logger.info(String.format("Handling connection from %s", clientSocket.getRemoteSocketAddress()));
-				RequestHandler handler = new RequestHandler(clientSocket, this);
+				RequestHandler handler = new RequestHandler(clientSocket, queue);
 				executor.execute(handler);
 					    
 			} catch (IOException e) {
@@ -63,27 +67,13 @@ public class LinePrinterDemonServer implements Server {
 		
 	}
 	
-	public void addPrinterQueue(String name) {
-		printQueues.put(name, new LinkedList<PrintJob>());
-	}
-	
 	
 	public static void main(String[] args) {
 		
-		Server lpd = new LinePrinterDemonServer();
-		lpd.addPrinterQueue("test");
-		
-		Map<String, byte[]> files = new HashMap<String,byte[]>();
-		files.put("phonebook", new byte[500]);
-		PrintJob pj = new PrintJob(new HashMap<String,byte[]>(), files, "chris", 990, 1, "desk01");
-		lpd.getQueue("test").add(pj);
-		lpd.start();
+	
 		
 	}
 
-	public List<PrintJob> getQueue(String name) {
-		return printQueues.get(name);
-	}
 	
 	
 	
