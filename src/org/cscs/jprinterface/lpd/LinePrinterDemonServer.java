@@ -6,6 +6,8 @@ import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
+
+import org.cscs.jprinterface.queue.QueueManager;
 /**
  * Implement a Line Printer Demon as specified in RFC 1179 and clarified by RFC 2569.
  * The demon must have one or more printQueues added to be useful, and will then manage collection
@@ -39,7 +41,7 @@ public class LinePrinterDemonServer implements Server {
 		    System.out.println("Could not listen on port");
 		    System.exit(-1);
 		}
-		logger.info(String.format("Listening on %d, printqueues %s", port, queue.getQueues()));
+		logger.info(String.format("Listening on %d, printqueues %s", port, queue.getQueueNames()));
 		
 		while (running ) {
 			

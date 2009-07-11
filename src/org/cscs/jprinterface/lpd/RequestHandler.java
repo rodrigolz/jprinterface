@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import org.cscs.jprinterface.queue.QueueManager;
+
 public class RequestHandler implements Runnable {
 	private static final Logger logger = Logger.getLogger(RequestHandler.class.getName());
 
@@ -125,7 +127,7 @@ public class RequestHandler implements Runnable {
 				logger.info(String.format(" Job recieve completed, putting on queue"));
 
 				PrintJob jb = jobBuilder.build();
-				queue.getQueue(queueName).add(jb);
+				queue.addJob(queueName, jb);
 				break;
 			case queueStatus:
 			case queueStatusVerbose:
@@ -144,7 +146,7 @@ public class RequestHandler implements Runnable {
 					}
 				}
 				queueName = queueName2.toString();
-				List<PrintJob> jobs = queue.getQueue(queueName);
+				List<PrintJob> jobs = queue.getQueueContent(queueName);
 				if (c == Command.queueStatus) {
 					renderQueueStatus(out, queueName, jobs);			
 				} else {

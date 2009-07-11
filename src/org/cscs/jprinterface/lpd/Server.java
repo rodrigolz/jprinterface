@@ -1,5 +1,7 @@
 package org.cscs.jprinterface.lpd;
 
+import org.cscs.jprinterface.queue.QueueManager;
+
 
 public interface Server {
 
