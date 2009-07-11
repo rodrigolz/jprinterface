@@ -62,7 +62,7 @@ public class RequestHandler implements Runnable {
 			    //  abort-job = %x1 LF
 				//  receive-control-file = %x2 number-of-bytes SP name-of-control-file LF
 				//  receive-data-file = %x03 number-of-bytes SP name-of-data-file LF
-				int jobid = queue.getNextJobId();
+				long jobid = queue.getNextJobId();
 				PrintJob.JobBuilder jobBuilder = new PrintJob.JobBuilder(jobid);
 				out.append((char) 0x00);
 				out.flush();

@@ -9,7 +9,7 @@ public interface QueueManager {
 	
 	public List<PrintJob> getQueue(String name);
 
-	public int getNextJobId();
+	public long getNextJobId();
 
 	public Set<String> getQueues();
 	

@@ -22,12 +22,12 @@ public class PrintJob implements Serializable {
 	public static class JobBuilder {
 		public final Map<String, byte[]> control = new HashMap<String, byte[]>();
 		public final Map<String, byte[]> data = new HashMap<String, byte[]>();	
-		private final int id;
+		private final long id;
 		private int copies;
 		private String host;
 		private String owner;
-		public JobBuilder(int id) {
-			this.id = id;
+		public JobBuilder(long jobid) {
+			this.id = jobid;
 		}
 		public JobBuilder addControlFile(String name, byte[] data) {
 			this.control.put(name, data);
@@ -56,12 +56,12 @@ public class PrintJob implements Serializable {
 	public final Map<String, byte[]> control;
 	public final Map<String, byte[]> data;
 	public final String owner;
-	public final int id;
+	public final long id;
 	public final int copies;
 	public final String host;
 	
 	public PrintJob(Map<String, byte[]> control, Map<String, byte[]> data,
-			String owner, int id, int copies, String host) {
+			String owner, long id, int copies, String host) {
 		this.control = control;
 		this.data = data;
 		this.owner = owner;
