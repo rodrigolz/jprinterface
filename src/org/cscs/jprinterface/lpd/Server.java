@@ -9,6 +9,8 @@ public interface Server {
 
 	public void setQueueManager(QueueManager queue);
 
+	public void shutdown();
+
 
 	
 }

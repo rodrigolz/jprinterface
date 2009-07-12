@@ -8,11 +8,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Logger;
 
 import org.cscs.jprinterface.lpd.PrintJob;
 
 public class DefaultQueueManager implements QueueManager {
-	
+	private static final Logger logger = Logger.getLogger(DefaultQueueManager.class.getName());
 	public final HashMap<String, List<PrintJob>> printQueues;
 	public final AtomicLong jobIdSeed;
 	public final List<QueueListener> listeners;
@@ -30,7 +31,7 @@ public class DefaultQueueManager implements QueueManager {
 		
 		jobIdSeed = new AtomicLong(datecode * 100);
 		
-		System.out.println(String.format("Starting queuemaneger with seed %d", jobIdSeed.get()));		
+		logger.info(String.format("Starting queuemaneger with seed %d", jobIdSeed.get()));		
 	}
 	
 	@Override

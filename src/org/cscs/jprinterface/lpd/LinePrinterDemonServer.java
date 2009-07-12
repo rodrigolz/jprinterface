@@ -23,7 +23,8 @@ public class LinePrinterDemonServer implements Server {
 
 	private int port = 515;
 	private ServerSocket serverSocket;
-	private ExecutorService executor = Executors.newSingleThreadExecutor();
+	private ExecutorService clientExectuor = Executors.newSingleThreadExecutor();
+	private ExecutorService serverExecutor = Executors.newSingleThreadExecutor();
 	private volatile boolean running = true;
 	
 	private QueueManager queue;
@@ -38,28 +39,39 @@ public class LinePrinterDemonServer implements Server {
 		try {
 		    serverSocket = new ServerSocket(port);
 		} catch (IOException e) {
-		    System.out.println("Could not listen on port");
-		    System.exit(-1);
+		    throw new RuntimeException("Could not listen on LPD port");		    
 		}
 		logger.info(String.format("Listening on %d, printqueues %s", port, queue.getQueueNames()));
 		
-		while (running ) {
-			
-			
-			Socket clientSocket = null;
-			try {
-			    clientSocket = serverSocket.accept();
-				logger.info(String.format("Handling connection from %s", clientSocket.getRemoteSocketAddress()));
-				RequestHandler handler = new RequestHandler(clientSocket, queue);
-				executor.execute(handler);
-					    
-			} catch (IOException e) {
-			    System.out.println("Accept failed");
-			    System.exit(-1);
+		clientExectuor.submit(new RunnableClientDispatcher());
+		
+	}
+	
+	class RunnableClientDispatcher implements Runnable {
+		@Override
+		public void run() {
+			while (running ) {				
+				Socket clientSocket = null;
+				try {
+				    clientSocket = serverSocket.accept();
+					logger.info(String.format("Handling connection from %s", clientSocket.getRemoteSocketAddress()));
+					RequestHandler handler = new RequestHandler(clientSocket, queue);
+					clientExectuor.execute(handler);
+						    
+				} catch (IOException e) {
+				    System.out.println("Accept failed");
+				    System.exit(-1);
+				}
 			}
 		}
+	}
+	
+	@Override
+	public void shutdown() {
+		clientExectuor.shutdownNow();
+		serverExecutor.shutdownNow();
 		
-	    try {
+		try {
 			serverSocket.close();
 		} catch (IOException e) {
 			e.printStackTrace();
