@@ -14,7 +14,7 @@ import org.cscs.jprinterface.queue.QueueManager;
  * The demon must have one or more printQueues added to be useful, and will then manage collection
  * of jobs to those queues and serving the status of the queues. To actually spool/process Jobs
  * deposited by clients, provide a JobListener implementation. The default implementation stalls
- * Jobs, ie. leaves them on the Queue. 
+ * Jobs, i.e. leaves them on the Queue. 
  * 
  * @author shuckc
  *

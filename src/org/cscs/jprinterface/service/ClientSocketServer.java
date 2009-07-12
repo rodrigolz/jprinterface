@@ -17,7 +17,7 @@ public class ClientSocketServer {
 	private final int port;
 	private final ExecutorService listeningExecutor;
 	private final ExecutorService clientExecutor;
-	ServerSocket ss;
+	ServerSocket ss = null;
 	
 	public ClientSocketServer(int port, QueueManager queueManager, int simultanousClients) {
 		this.port = port;
@@ -66,9 +66,8 @@ public class ClientSocketServer {
 
 	public void shutdown() {
 		try {
-			ss.close();
+			if (ss != null) ss.close();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		clientExecutor.shutdownNow();
