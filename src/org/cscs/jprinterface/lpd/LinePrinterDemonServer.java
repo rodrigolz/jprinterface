@@ -21,10 +21,10 @@ import org.cscs.jprinterface.queue.QueueManager;
 public class LinePrinterDemonServer implements Server {
 	private static final Logger logger = Logger.getLogger(LinePrinterDemonServer.class.getName());
 
-	private int port = 515;
+	private final int port = 515;
 	private ServerSocket serverSocket;
-	private ExecutorService clientExectuor = Executors.newSingleThreadExecutor();
-	private ExecutorService serverExecutor = Executors.newSingleThreadExecutor();
+	private final ExecutorService clientExectuor = Executors.newSingleThreadExecutor();
+	private final ExecutorService serverExecutor = Executors.newSingleThreadExecutor();
 	private volatile boolean running = true;
 	
 	private QueueManager queue;
@@ -43,7 +43,7 @@ public class LinePrinterDemonServer implements Server {
 		}
 		logger.info(String.format("Listening on %d, printqueues %s", port, queue.getQueueNames()));
 		
-		clientExectuor.submit(new RunnableClientDispatcher());
+		serverExecutor.submit(new RunnableClientDispatcher());
 		
 	}
 	

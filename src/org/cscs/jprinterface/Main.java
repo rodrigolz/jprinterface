@@ -35,8 +35,6 @@ public class Main {
 		ClientSocketServer service = new ClientSocketServer(8081, queueManager, 5);
 		service.start();
 		
-		
-		
 		FilesystemPersistingListener writer = new FilesystemPersistingListener("/opt/jprinterface-read-only/jobs");
 		queueManager.addListener(writer);
 		

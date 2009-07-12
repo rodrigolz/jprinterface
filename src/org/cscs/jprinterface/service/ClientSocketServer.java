@@ -27,8 +27,7 @@ public class ClientSocketServer {
 
 	public void start() {
 		try {
-			ss = new ServerSocket(port);
-			
+			ss = new ServerSocket(port);			
 			logger.info(String.format("Listening on %d", port ));
 
 		} catch (IOException io) {
