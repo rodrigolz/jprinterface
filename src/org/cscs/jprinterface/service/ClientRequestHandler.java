@@ -12,7 +12,6 @@ public class ClientRequestHandler implements Runnable {
 		this.cs = clientSocket;
 	}
 
-	@Override
 	public void run() {
 		DataInputStream dis;
 		try {

@@ -3,6 +3,7 @@ package org.cscs.jprinterface.lpd;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
@@ -25,11 +26,9 @@ public class LinePrinterDemonServer implements Server {
 	private ServerSocket serverSocket;
 	private final ExecutorService clientExectuor = Executors.newSingleThreadExecutor();
 	private final ExecutorService serverExecutor = Executors.newSingleThreadExecutor();
-	private volatile boolean running = true;
 	
 	private QueueManager queue;
 
-	@Override
 	public void setQueueManager(QueueManager queue) {
 		this.queue = queue;		
 	}
@@ -39,7 +38,7 @@ public class LinePrinterDemonServer implements Server {
 		try {
 		    serverSocket = new ServerSocket(port);
 		} catch (IOException e) {
-		    throw new RuntimeException("Could not listen on LPD port");		    
+		    throw new RuntimeException(String.format("Could not listen on LPD port %d", port));
 		}
 		logger.info(String.format("Listening on %d, printqueues %s", port, queue.getQueueNames()));
 		
@@ -48,16 +47,17 @@ public class LinePrinterDemonServer implements Server {
 	}
 	
 	class RunnableClientDispatcher implements Runnable {
-		@Override
 		public void run() {
-			while (running ) {				
+			while (true ) {				
 				Socket clientSocket = null;
 				try {
 				    clientSocket = serverSocket.accept();
 					logger.info(String.format("Handling connection from %s", clientSocket.getRemoteSocketAddress()));
 					RequestHandler handler = new RequestHandler(clientSocket, queue);
 					clientExectuor.execute(handler);
-						    
+				} catch (SocketException se) {
+					// socket closed from shutdown thread
+					break;
 				} catch (IOException e) {
 				    System.out.println("Accept failed");
 				    System.exit(-1);
@@ -66,13 +66,12 @@ public class LinePrinterDemonServer implements Server {
 		}
 	}
 	
-	@Override
 	public void shutdown() {
 		clientExectuor.shutdownNow();
 		serverExecutor.shutdownNow();
 		
 		try {
-			serverSocket.close();
+			if (serverSocket != null) serverSocket.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

@@ -3,6 +3,7 @@ package org.cscs.jprinterface.service;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
@@ -38,21 +39,25 @@ public class ClientSocketServer {
 		 */
 		
 		listeningExecutor.submit(new Runnable() {
-			@Override
 			public void run() {
-				while (true ) {
-					
-					Socket clientSocket = null;
-					try {
-					    clientSocket = ss.accept();
-						logger.info(String.format("Handling connection from %s", clientSocket.getRemoteSocketAddress()));
-						ClientRequestHandler handler = new ClientRequestHandler(clientSocket);
-						clientExecutor.execute(handler);
-							    
-					} catch (IOException e) {
-						logger.log(Level.WARNING, "Error handling connection", e);
+				try {
+					while (true ) {
+						
+						Socket clientSocket = null;
+						try {
+						    clientSocket = ss.accept();
+							logger.info(String.format("Handling connection from %s", clientSocket.getRemoteSocketAddress()));
+							ClientRequestHandler handler = new ClientRequestHandler(clientSocket);
+							clientExecutor.execute(handler);
+						} catch (SocketException se) {
+							break;
+						} catch (IOException e) {
+							logger.log(Level.WARNING, "Error handling connection", e);
+						}
 					}
-				}				
+				} finally {
+					logger.info("Client socket server listening runnable existing...");
+				}
 			}
 		});
 		
@@ -60,6 +65,12 @@ public class ClientSocketServer {
 	}
 
 	public void shutdown() {
+		try {
+			ss.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		clientExecutor.shutdownNow();
 		listeningExecutor.shutdownNow();
 	}

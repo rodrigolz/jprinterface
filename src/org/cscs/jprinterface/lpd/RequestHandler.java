@@ -31,11 +31,11 @@ public class RequestHandler implements Runnable {
 	}
 
 	private final Socket clientSocket;
-	private final QueueManager queue;
+	private final QueueManager queueManager;
 	
 	public RequestHandler(Socket clientSocket, QueueManager queue) {
 		this.clientSocket = clientSocket;
-		this.queue = queue;
+		this.queueManager = queue;
 	}
 
 	public void run() {
@@ -49,7 +49,7 @@ public class RequestHandler implements Runnable {
 			mode = in.readUnsignedByte();
 			Command c  = Command.values()[mode];
 			logger.info(String.format("Client request: %s", c));
-			String queueName;
+			String queue;
 			switch (c) {
 			case print:
 				// print-waiting-jobs = %x01 printer-name LF
@@ -63,7 +63,7 @@ public class RequestHandler implements Runnable {
 			    //  abort-job = %x1 LF
 				//  receive-control-file = %x2 number-of-bytes SP name-of-control-file LF
 				//  receive-data-file = %x03 number-of-bytes SP name-of-data-file LF
-				long jobid = queue.getNextJobId();
+				long jobid = queueManager.getNextJobId();
 				PrintJob.JobBuilder jobBuilder = new PrintJob.JobBuilder(jobid);
 				out.append((char) 0x00);
 				out.flush();
@@ -116,7 +116,7 @@ public class RequestHandler implements Runnable {
 				logger.info(String.format(" Job recieve completed, putting on queue"));
 
 				PrintJob jb = jobBuilder.build();
-				queue.addJob(queueName, jb);
+				queueManager.addJob(queue, jb);
 				break;
 			case queueStatus:
 			case queueStatusVerbose:
@@ -126,11 +126,11 @@ public class RequestHandler implements Runnable {
 				String[] line = readline(in).split("\\s");
 				queue = line[0];
 				
-				List<PrintJob> jobs = server.getQueue(queue);
+				List<PrintJob> jobs = queueManager.getQueueContent(queue);
 				if (c == Command.queueStatus) {
-					renderQueueStatus(out, queueName, jobs);			
+					renderQueueStatus(out, queue, jobs);			
 				} else {
-					renderQueueVerboseStatus(out, queueName, jobs);
+					renderQueueVerboseStatus(out, queue, jobs);
 				}	
 			}
 			

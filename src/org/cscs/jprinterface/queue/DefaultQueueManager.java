@@ -34,7 +34,6 @@ public class DefaultQueueManager implements QueueManager {
 		logger.info(String.format("Starting queuemaneger with seed %d", jobIdSeed.get()));		
 	}
 	
-	@Override
 	public Set<String> getQueueNames() {
 		return printQueues.keySet();
 	}
@@ -60,12 +59,10 @@ public class DefaultQueueManager implements QueueManager {
 			l.newJob(job);
 	}
 	
-	@Override
 	public long getNextJobId() {
 		return jobIdSeed.incrementAndGet();
 	}
 
-	@Override
 	public void addListener(QueueListener listener) {
 		listeners.add(listener);
 	}	
