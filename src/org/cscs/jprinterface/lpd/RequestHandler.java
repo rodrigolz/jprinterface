@@ -3,7 +3,6 @@ package org.cscs.jprinterface.lpd;
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.InputMismatchException;
@@ -54,12 +53,12 @@ public class RequestHandler implements Runnable {
 			switch (c) {
 			case print:
 				// print-waiting-jobs = %x01 printer-name LF
-				queueName = readQueue(in);
+				queue = readline(in);
 				break;
 			case recvJob:
 			    // receive-job = %x02 printer-name LF
-				queueName = readQueue(in);
-				logger.info(String.format("   recv queue: %s", queueName));
+				queue = readline(in);
+				logger.info(String.format("   recv queue: %s", queue));
 				// now read a sub-command, one of
 			    //  abort-job = %x1 LF
 				//  receive-control-file = %x2 number-of-bytes SP name-of-control-file LF
@@ -86,19 +85,9 @@ public class RequestHandler implements Runnable {
 	
 					case 3:
 						// receive-data-file = %x03 number-of-bytes SP name-of-data-file LF
-						StringBuilder bufByteCount = new StringBuilder();
-						StringBuilder bufFileName = new StringBuilder();
-						StringBuilder bufActive = bufByteCount;
-						int buf;
-						while (0x0A != (buf = in.readUnsignedByte())) {
-							if (buf == 0x20) {
-								bufActive = bufFileName;
-							} else {
-								bufActive.append((char)buf);
-							}
-						}
-						int byteCount = Integer.parseInt(bufByteCount.toString());
-						String fileName = bufFileName.toString();
+						String[] line = readline(in).split("\\s");
+						int byteCount = Integer.parseInt(line[0]);
+						String fileName = line[1];
 						logger.info(String.format("    recieve file '%s' bytes %d", fileName, byteCount));
 						
 						out.append((char) 0x00);
@@ -133,20 +122,11 @@ public class RequestHandler implements Runnable {
 			case queueStatusVerbose:
 				// send-queue-short = %x03 printer-name *(SP(user-name / job-number)) LF
 				// send-queue-long  = %x04 printer-name *(SP(user-name / job-number)) LF
-
-				StringBuilder queueName2 = new StringBuilder();
-				StringBuilder filter = new StringBuilder();
-				StringBuilder reading = queueName2;
-				int buf;
-				while (0x0A != (buf = in.read())) {
-					if (buf == 0x20) {
-						reading = filter;
-					} else {
-						reading.append((char)buf);
-					}
-				}
-				queueName = queueName2.toString();
-				List<PrintJob> jobs = queue.getQueueContent(queueName);
+				
+				String[] line = readline(in).split("\\s");
+				queue = line[0];
+				
+				List<PrintJob> jobs = server.getQueue(queue);
 				if (c == Command.queueStatus) {
 					renderQueueStatus(out, queueName, jobs);			
 				} else {
@@ -174,6 +154,7 @@ public class RequestHandler implements Runnable {
 		
 
 	}
+
 
 	public static void renderQueueVerboseStatus(PrintWriter out, String queue, List<PrintJob> jobs) {
 		/*
@@ -273,15 +254,17 @@ public class RequestHandler implements Runnable {
 
 	}
 
-	
-	
-	private String readQueue(InputStream in) throws IOException {
-		StringBuilder queueName = new StringBuilder();
-		int buf;
-		while (0x0A != (buf = in.read())) {
-			queueName.append((char)buf);
+	// Character-set aware implementation of DataInputStream.readLine()
+	private String readline(DataInputStream in) throws IOException {
+		
+		byte[] buffer = new byte[1000];
+		int j = 0;
+
+		byte buf;
+		while (0x0A != (buf = in.readByte())) {
+			buffer[j++] = buf;
 		}		
-		return queueName.toString();
+		return new String(buffer, 0, j, "ISO-8859-1");
 	}
 
 }
