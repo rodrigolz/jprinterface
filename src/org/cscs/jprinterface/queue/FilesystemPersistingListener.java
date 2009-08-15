@@ -30,14 +30,6 @@ public class FilesystemPersistingListener implements QueueListener {
 		logger.info("Create writer: " + directoryRoot.getAbsolutePath());
 	}
 	
-	public void newJob(PrintJob job) {
-		executor.submit(new PersistJob(job));
-	}
-	
-	public void stateChange(PrintJob job, Object state) {
-		executor.submit(new PersistJob(job));
-	}
-
 	private class PersistJob implements Runnable {
 		final PrintJob job;
 		
@@ -65,6 +57,16 @@ public class FilesystemPersistingListener implements QueueListener {
 	public void shutdown() {
 		// allow pending writes to complete (holding back the shutdown handler)
 		executor.shutdown();
+	}
+
+	@Override
+	public void jobChange(String queue, PrintJob job, ChangeEvent event) {
+		executor.submit(new PersistJob(job));		
+	}
+
+	@Override
+	public void queueChange(String queue, ChangeEvent event) {
+		
 	}
 	
 }

@@ -11,6 +11,7 @@ import org.cscs.jprinterface.queue.DefaultQueueManager;
 import org.cscs.jprinterface.queue.FilesystemPersistingListener;
 import org.cscs.jprinterface.queue.QueueManager;
 import org.cscs.jprinterface.service.ClientSocketServer;
+import org.cscs.jprinterface.web.Webserver;
 
 public class Main {
 
@@ -22,6 +23,7 @@ public class Main {
 		Server lpd = null;
 		ClientSocketServer service = null;
 		FilesystemPersistingListener writer = null;
+		Webserver web = null;
 		try {
 			
 			CountDownLatch shutdownLatch = new CountDownLatch(1); 
@@ -37,16 +39,19 @@ public class Main {
 			PrintJob pj = new PrintJob(new HashMap<String,byte[]>(), files, "chris", 990, 1, "desk01");
 			queueManager.addJob("test", pj);
 			
-			service = new ClientSocketServer(8081, queueManager, 5);
+			service = new ClientSocketServer(8081, queueManager);
 			service.start();
 			
 			writer = new FilesystemPersistingListener("/opt/jprinterface-read-only/jobs");
 			queueManager.addListener(writer);
 			
 			lpd = new LinePrinterDemonServer();
-			lpd.setQueueManager(queueManager);
-			
+			lpd.setQueueManager(queueManager);			
 			lpd.start();
+			
+			web = new Webserver(queueManager);
+			web.start();
+			
 			try {
 				System.out.println("startup completed, main thread awaiting shutdown latch");
 				shutdownLatch.await();
@@ -60,6 +65,7 @@ public class Main {
 			if (lpd != null) lpd.shutdown();
 			if (service != null) service.shutdown();
 			if (writer != null) writer.shutdown();
+			if (web != null) web.shutdown();
 			System.out.println("main thread exited finally block");
 
 		}

@@ -4,8 +4,6 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-
-
 /** LPD representation of a PrintJob. The somewhat arbitrary collection of fields are those 
  * required to implement the methods defined by RFC2659.
  * @author shuckc

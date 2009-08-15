@@ -11,6 +11,13 @@ import java.util.logging.Logger;
 
 import org.cscs.jprinterface.queue.QueueManager;
 
+/** Listen for incoming Client connections.
+ * Note: ClientSocketServer is bound to a queuemanager. This is passed
+ * to ClientRequestHandlers so that they can register there own QueueListeners
+ * to notify clients about activity.
+ * 
+ * @author chris *
+ */
 public class ClientSocketServer {
 	private static final Logger logger = Logger.getLogger(ClientSocketServer.class.getName());
 	
@@ -19,11 +26,18 @@ public class ClientSocketServer {
 	private final ExecutorService clientExecutor;
 	ServerSocket ss = null;
 	
+	private final QueueManager queueManager;
+	public ClientSocketServer(int port, QueueManager queueManager) {
+		this(port,queueManager,5);
+	}
+	
+			
 	public ClientSocketServer(int port, QueueManager queueManager, int simultanousClients) {
 		this.port = port;
 		//TODO: give the rejection policy of this queue some thought
 		clientExecutor = Executors.newFixedThreadPool(simultanousClients);
 		listeningExecutor = Executors.newSingleThreadExecutor();
+		this.queueManager = queueManager;
 	}
 
 	public void start() {
@@ -47,7 +61,7 @@ public class ClientSocketServer {
 						try {
 						    clientSocket = ss.accept();
 							logger.info(String.format("Handling connection from %s", clientSocket.getRemoteSocketAddress()));
-							ClientRequestHandler handler = new ClientRequestHandler(clientSocket);
+							ClientRequestHandler handler = new ClientRequestHandler(clientSocket, queueManager);
 							clientExecutor.execute(handler);
 						} catch (SocketException se) {
 							break;

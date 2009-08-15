@@ -9,6 +9,7 @@ public interface QueueManager {
 
 	public long getNextJobId();
 	public void addListener(QueueListener listener);
+	public void removeListener(QueueListener listener);
 	
 	public void createQueue(String name);
 	public Set<String> getQueueNames();	

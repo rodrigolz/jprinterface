@@ -12,7 +12,19 @@ import java.util.logging.Logger;
 
 import org.cscs.jprinterface.queue.QueueManager;
 
+/**
+ * Handle an LPD client connection (over a TCP socket).
+ * 
+ * I have found experimentally that while this class implements the
+ * submit-job, resume printing and queue-status functions, the
+ * Microsoft Windows LPD client stack does not bother to query
+ * printer queue status, assumes submitting a job
+ * indicates completion.
+ * 
+ * @author chris
+ */
 public class RequestHandler implements Runnable {
+	
 	private static final Logger logger = Logger.getLogger(RequestHandler.class.getName());
 
 	public enum Command {
@@ -54,6 +66,7 @@ public class RequestHandler implements Runnable {
 			case print:
 				// print-waiting-jobs = %x01 printer-name LF
 				queue = readline(in);
+				// NO-OP
 				break;
 			case recvJob:
 			    // receive-job = %x02 printer-name LF
@@ -150,8 +163,6 @@ public class RequestHandler implements Runnable {
 		}
 		
 		logger.info(String.format("request handler completed"));
-
-		
 
 	}
 
