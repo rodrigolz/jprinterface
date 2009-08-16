@@ -66,7 +66,7 @@ public class ClientRequestHandler implements Runnable {
 				// note callbacks here on another thread. They indicate we need to 
 				// tell the client something
 				listener = new QueueListener() {
-					@Override
+					
 					public void jobChange(String queue, PrintJob job,ChangeEvent event) {
 						try {
 							if (protocolMessageLock.tryLock(100, TimeUnit.MILLISECONDS)) {
@@ -82,7 +82,7 @@ public class ClientRequestHandler implements Runnable {
 							e.printStackTrace();
 						}					
 					}					
-					@Override
+					
 					public void queueChange(String queue, ChangeEvent event) {
 						try {
 							if (protocolMessageLock.tryLock(100, TimeUnit.MILLISECONDS)) {

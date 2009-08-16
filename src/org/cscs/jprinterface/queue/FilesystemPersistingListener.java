@@ -59,12 +59,10 @@ public class FilesystemPersistingListener implements QueueListener {
 		executor.shutdown();
 	}
 
-	@Override
 	public void jobChange(String queue, PrintJob job, ChangeEvent event) {
 		executor.submit(new PersistJob(job));		
 	}
 
-	@Override
 	public void queueChange(String queue, ChangeEvent event) {
 		
 	}

@@ -22,7 +22,7 @@ import org.cscs.jprinterface.queue.QueueManager;
 public class LinePrinterDemonServer implements Server {
 	private static final Logger logger = Logger.getLogger(LinePrinterDemonServer.class.getName());
 
-	private final int port = 515;
+	private int port = 515;
 	private ServerSocket serverSocket;
 	private final ExecutorService clientExectuor = Executors.newSingleThreadExecutor();
 	private final ExecutorService serverExecutor = Executors.newSingleThreadExecutor();
@@ -35,17 +35,26 @@ public class LinePrinterDemonServer implements Server {
 	
 	public void start() {
 		
+		// workaround for 515 being a demon port on OSX
+		// TODO: check if privileged user
+		if (isMac()) port = 1515;
+		
 		try {
 		    serverSocket = new ServerSocket(port);
 		} catch (IOException e) {
-		    throw new RuntimeException(String.format("Could not listen on LPD port %d", port));
+		    throw new RuntimeException(String.format("Could not listen on LPD port %d", port), e);
 		}
-		logger.info(String.format("Listening on %d, printqueues %s", port, queue.getQueueNames()));
+		logger.info(String.format("LPD listening on %d, printqueues %s", port, queue.getQueueNames()));
 		
 		serverExecutor.submit(new RunnableClientDispatcher());
 		
 	}
 	
+	private boolean isMac() {
+		String osName = System.getProperty("os.name").toUpperCase();
+		return osName.startsWith("MAC OS");
+	}
+
 	class RunnableClientDispatcher implements Runnable {
 		public void run() {
 			while (true ) {				

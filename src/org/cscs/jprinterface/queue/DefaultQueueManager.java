@@ -78,7 +78,7 @@ public class DefaultQueueManager implements QueueManager {
 	public void addListener(QueueListener listener) {
 		listeners.add(listener);
 	}
-	@Override
+	
 	public void removeListener(QueueListener listener) {
 		listeners.remove(listener);
 		
