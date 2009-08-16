@@ -27,7 +27,7 @@ public class FilesystemPersistingListener implements QueueListener {
 		executor = Executors.newSingleThreadExecutor();
 		directoryRoot = new File(outputDirectory);
 		directoryRoot.mkdirs();		
-		logger.info("Create writer: " + directoryRoot.getAbsolutePath());
+		logger.info("Writing changed jobs to: " + directoryRoot.getAbsolutePath());
 	}
 	
 	private class PersistJob implements Runnable {
