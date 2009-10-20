@@ -44,19 +44,25 @@ public class CommDriverDS2480B {
 			
 		this.port = (SerialPort) unknownPort;
 		try {
-			this.port.setSerialPortParams(9600,SerialPort.DATABITS_8,SerialPort.STOPBITS_1,SerialPort.PARITY_NONE);
+			// this.port.setSerialPortParams(9600,SerialPort.DATABITS_8,SerialPort.STOPBITS_1,SerialPort.PARITY_NONE);
 			this.port.setFlowControlMode(SerialPort.FLOWCONTROL_NONE);
 						
 			// flashRTS();			
-			
 			input = new DataInputStream(new DebugInputStream(this.port.getInputStream()));
 			output = new DataOutputStream(new DebugOutputStream(this.port.getOutputStream()));
+
+			// cause software reset by using PARITY_SPACE for one byte...
+			System.out.println("sending hardware reset");
+			this.port.setSerialPortParams(9600, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_SPACE);
+			output.write(0x00);
+			Thread.sleep(100);
 			
-			// send initial reset byte
+			// send sync (reset) pulse for clock calibration
+			this.port.setSerialPortParams(9600, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
 			output.write(Integer.parseInt("11000001", 2));
 			output.flush();
-			Thread.sleep(50);
-			// int read = input.read();
+			Thread.sleep(50);			
+			// note, no response byte generated
 			
 		} catch (UnsupportedCommOperationException e) {
 			throw new IllegalStateException("port did not accept params", e);
@@ -120,14 +126,18 @@ public class CommDriverDS2480B {
 				System.out.println("search bus");
 				output.write(0x0F);
 				output.flush();
+				int reply = input.read();
+				if (reply != 0x0F) throw new RuntimeException("lost sync");
 				output.write(0xE3);
 				output.flush();
 				output.write(0xB1);
 				output.flush();
 				output.write(0xE1);
 				System.out.println("sending 16-byte search address");
-				output.write(id_tx_buf);
-				input.readFully(id_rx_buf);
+				for (int c = 0; c < 8; c++) {
+					output.write(id_tx_buf[c]);
+					id_rx_buf[c] = (byte) input.read();
+				}
 				int t;
 				busy = false;
 				for (int d = 0; d < 64; d++) {
@@ -145,7 +155,7 @@ public class CommDriverDS2480B {
 						System.out.println(String.format("search cancelled at %d, no device", d));
 						// set bit r(d-1) to 1
 						t = d - 1;
-						id_tx_buf[t/4] = (byte) (id_tx_buf[t/4] | 0x03 << ((t%4)*2));
+						id_tx_buf[t/4] = (byte) (id_tx_buf[t/4] | (0x03 << ((t%4)*2)));
 						busy = true;
 						break;
 					}
