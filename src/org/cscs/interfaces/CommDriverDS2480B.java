@@ -10,8 +10,11 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 
@@ -109,14 +112,15 @@ public class CommDriverDS2480B {
 	}
     
 
-    private long[] enumerateBusDevices() {
+    private List<String> enumerateBusDevices() {
+    	List<String> devices = new ArrayList<String>();
     	try {
     		System.out.println("enumerating bus devices");
-			
+			    		
     		byte[] id_tx_buf = new byte[16];
 			byte[] id_rx_buf = new byte[16];
 			boolean busy = true;
-			int highestDiscrepancy = 0;
+			int highestDiscrepancy = -1;
 			
 			while (busy) {
     			System.out.println(sendReset(Speed.REGULAR));
@@ -124,10 +128,10 @@ public class CommDriverDS2480B {
 				output.write(0xE1);
 				output.flush();
 				System.out.println("search bus");
-				output.write(0x0F);
+				output.write(0xF0);
 				output.flush();
 				int reply = input.read();
-				if (reply != 0x0F) throw new RuntimeException("lost sync");
+				if (reply != 0xF0) throw new RuntimeException("lost sync");
 				output.write(0xE3);
 				output.flush();
 				output.write(0xB1);
@@ -140,26 +144,41 @@ public class CommDriverDS2480B {
 				}
 				int t;
 				busy = false;
+				byte[] path = new byte[8];
 				for (int d = 0; d < 64; d++) {
 					int rd = (id_rx_buf[d/4] >> ((d%4)*2)) & 3;
-					System.out.println(String.format(" bit %d  reads %d", d, rd));
-					if (rd == 0) {
-						// no descrepancy, chose 0
-						
-					} else if (rd == 1) { 
-						// discrepancy, chose 1/0
+					// System.out.println(String.format(" bit %d  reads %d", d, rd));
+					switch (rd) {
+					case 0: // no discrepancy, chose 0
+						break ;
+					case 1: // discrepancy, chose 0
 						System.out.println(String.format("discrepancy at %d", d));
-					} else if (rd == 2) {
-						// no discrepancy, chose 1
-					} else {
-						System.out.println(String.format("search cancelled at %d, no device", d));
-						// set bit r(d-1) to 1
-						t = d - 1;
-						id_tx_buf[t/4] = (byte) (id_tx_buf[t/4] | (0x03 << ((t%4)*2)));
-						busy = true;
+						if (highestDiscrepancy < d) highestDiscrepancy = d;
 						break;
-					}
+					case 2: 	
+						// no discrepancy, chose 1
+						path[d/8] = (byte) (path[d/8] | 1 << (d % 8));
+						break; 
+					case 3:
+						// discrepancy, chose 1
+						System.out.println(String.format("discrepancy at %d", d));
+						if (highestDiscrepancy < d) highestDiscrepancy = d;
+						break;
+					} 
+					
+					// t = d ;
+					// id_tx_buf[t/4] = (byte) (id_tx_buf[t/4] | (0x03 << ((t%4)*2)));
+					// busy = true;
+
 				}
+				if (highestDiscrepancy == -1) {
+					// only one node
+					String s = Utils.byteArrayToHexString(path);
+					System.out.println("address: " + s);
+					assert(s.length() == 16);
+					devices.add(s);
+				}
+				
 				output.write(0xE3);  // command mode
 				output.flush();
 				output.write(0xA1);  // search accell off
@@ -170,7 +189,7 @@ public class CommDriverDS2480B {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		return null;
+		return devices;
 	}
 
     private void close() {
@@ -189,7 +208,11 @@ public class CommDriverDS2480B {
         	}
             
         	CommDriverDS2480B driver = new CommDriverDS2480B(CommPortIdentifier.getPortIdentifier("/dev/ttyUSB0"));
-        	driver.enumerateBusDevices();
+        	List<String> devices = driver.enumerateBusDevices();
+
+        	for (String device: devices) {
+        		int temp = driver.readTemperature(device);
+        	}
         	//driver.enumerateBusDevices();
         	//driver.enumerateBusDevices();
         	//driver.enumerateBusDevices();
@@ -205,6 +228,68 @@ public class CommDriverDS2480B {
         }
     }
     
+	private int readTemperature(String device) {
+		assert(device.length() == 16);
+		byte[] address = Utils.hexStringToByteArray(device);
+		System.out.println(String.format("requesting conversion for %s", device)); 
+		try {
+			sendByte(0xE3); // cmd mode
+			sendByte(0x39); //pullup duration 524ms
+			int reply = input.read();
+			if (reply != 0x38) throw new RuntimeException("lost sync");
+			sendReset(Speed.REGULAR);
+			sendByte(0xE1); // data mode
+			sendByte(0x55); // match rom
+			for (int i = 0; i < 8; i++) sendByte(address[i]);
+			sendByte(0xE3); // cmd mode
+			sendByte(0xEF); // arm strong pullup
+			sendByte(0xF1); // terminate on pulse
+			reply = input.read();
+			if (reply != 0x55) throw new RuntimeException("lost sync " + Integer.toHexString(reply));
+			sendByte(0xE1); // data
+			sendByte(0x44); // convert
+			
+			reply = input.read();
+			if (reply != 0x28) throw new RuntimeException("lost sync " +Integer.toHexString(reply));
+			
+			sendByte(0xE3); // cmd mode
+			sendByte(0xED); // disable strong pullup
+			sendByte(0xF1); // terminate on pulse
+			sendReset(Speed.REGULAR);
+			
+			sendByte(0xE1); // data mode
+			sendByte(0x55); // match rom
+			for (int i = 0; i < 8; i++) sendByte(address[i]);
+			sendByte(0xBE); // read scratchpad
+			byte[] scratch = new byte[8];
+			for (int i = 0; i < 8; i++) {
+				scratch[i] = (byte) this.input.read();
+				sendByte(0xFF); // dummy, continue read scratchpad
+			}
+			int crc = this.input.read();
+			
+			sendByte(0xE3); // cmd mode
+			sendReset(Speed.REGULAR);
+						
+			// output values
+			System.out.println("scatchpad " + Utils.byteArrayToHexString(scratch));
+			System.out.println("crc " + Integer.toHexString(crc));
+			
+			
+		} catch (IOException io) {
+			
+		}
+		
+		return 0;
+		
+		
+	}
+
+	private void sendByte(int b) throws IOException {
+		this.output.write(b); //command mode
+		this.output.flush();
+	}
+
 	@SuppressWarnings("unchecked")
 	public static Set<CommPortIdentifier> getAvailableSerialPorts() {
         HashSet<CommPortIdentifier> h = new HashSet<CommPortIdentifier>();
