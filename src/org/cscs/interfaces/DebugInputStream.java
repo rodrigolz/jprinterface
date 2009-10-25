@@ -13,8 +13,9 @@ public class DebugInputStream extends InputStream {
 	@Override
 	public int read() throws IOException {
 		int b = wrapped.read();
-		String bs = Integer.toBinaryString(b);		
-		System.out.println(String.format(">> recv %s%s ", pad.substring(0, 8-bs.length()), bs));
+		String bs = Integer.toBinaryString(b);
+		String hs = Integer.toHexString(b);
+		System.out.println(String.format("%d >> recv %s%s %s%s", System.currentTimeMillis(), pad.substring(0, 8-bs.length()), bs, pad.substring(0,2-hs.length()), hs));
 		return b;
 	}
 

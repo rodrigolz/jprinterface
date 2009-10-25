@@ -10,11 +10,14 @@ public class DebugOutputStream extends OutputStream {
 	public DebugOutputStream(OutputStream outputStream) {
 		this.wrapped = outputStream;
 	}
-
+	
 	@Override
 	public void write(int b) throws IOException {
-		String bs = Integer.toBinaryString(b);		
-		System.out.println(String.format("<< sent %s%s ", pad.substring(0, 8-bs.length()), bs));
+		String bs = Integer.toBinaryString(b & 0xFF);		
+		String hs = Integer.toHexString(b & 0xFF);
+		if (bs.length() > 8) throw new RuntimeException(bs);
+		if (hs.length() > 2) throw new RuntimeException(bs);
+		System.out.println(String.format("%d << sent %s%s %s%s", System.currentTimeMillis(), pad.substring(0, 8-bs.length()), bs, pad.substring(0,2-hs.length()), hs));
 		wrapped.write(b);
 	}
 
