@@ -9,12 +9,18 @@ import gnu.io.UnsupportedCommOperationException;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
 
 public class CommDriverDS2480B {
 	
@@ -24,8 +30,6 @@ public class CommDriverDS2480B {
 	
 	final private DataInputStream input;
 	final private DataOutputStream output;
-	
-	final private Semaphore semaphore = new Semaphore(1);
 	
 	private static enum Speed { REGULAR, FLEXIBLE, OVERDRIVE };
 	private static enum ResetStatus { BUS_SHORTED, PRESENCE_PULSE, ALARM_PULSE, NO_REACTION };
@@ -72,21 +76,18 @@ public class CommDriverDS2480B {
 		} catch (InterruptedException e) {
 			throw new IllegalStateException("port did not accept params", e);
 		}
-		
-		
-    	
-    }
-
-	private static void flashRTSLoop(SerialPort port) throws InterruptedException {
-		while (true) {			
-			port.setRTS(true);
-			System.out.print("on");
-			Thread.sleep(1000);			
-			port.setRTS(false);
-			System.out.print("off");
-			Thread.sleep(1000);
-		}		
 	}
+
+//	private static void flashRTSLoop(SerialPort port) throws InterruptedException {
+//		while (true) {			
+//			port.setRTS(true);
+//			System.out.print("on");
+//			Thread.sleep(1000);			
+//			port.setRTS(false);
+//			System.out.print("off");
+//			Thread.sleep(1000);
+//		}		
+//	}
 
 	private ResetStatus sendReset(Speed speed) throws IOException {
 		int b = 0;
@@ -100,13 +101,13 @@ public class CommDriverDS2480B {
 		}
 		output.write(b);
 		output.flush();
-		
-		int read = input.read();
+
+		// mask check for  11X011XX  
+		int read = readChecked(0xCC, 0xDC);
 		if ((read & 3) == 0) return ResetStatus.BUS_SHORTED;
 		if ((read & 3) == 1) return ResetStatus.PRESENCE_PULSE;
 		if ((read & 3) == 2) return ResetStatus.ALARM_PULSE;
-		return ResetStatus.NO_REACTION;
-		
+		return ResetStatus.NO_REACTION;		
 	}
     
 
@@ -119,7 +120,7 @@ public class CommDriverDS2480B {
 			byte[] id_rx_buf = new byte[16];
 			boolean busy = true;
 			int highestDiscrepancy = -1;
-			
+			Arrays.fill(id_tx_buf, (byte)0x00);
 			while (busy) {
     			sendCheckedReset(Speed.REGULAR);
 				System.out.println("switch data mode");
@@ -134,6 +135,8 @@ public class CommDriverDS2480B {
 					sendByte(id_tx_buf[c]);
 					id_rx_buf[c] = input.readByte();
 				}
+				System.out.println(String.format("sent: %s", Utils.byteArrayToHexString(id_tx_buf)));
+				System.out.println(String.format("recv: %s", Utils.byteArrayToHexString(id_rx_buf)));
 				
 				busy = false;
 				int discrepancies = 0;
@@ -145,7 +148,7 @@ public class CommDriverDS2480B {
 					case 0: // no discrepancy, chose 0
 						break ;
 					case 1: // discrepancy, chose 0
-						System.out.println(String.format("discrepancy at %d", d));
+						System.out.println(String.format("lowest discrepancy bit %d/64", d));
 						if (highestDiscrepancy < d) highestDiscrepancy = d;
 						discrepancies++;
 						break;
@@ -155,6 +158,7 @@ public class CommDriverDS2480B {
 						break; 
 					case 3:
 						// discrepancy, chose 1
+						path[d/8] = (byte) (path[d/8] | 1 << (d % 8));
 						System.out.println(String.format("discrepancy at %d", d));
 						if (highestDiscrepancy < d) highestDiscrepancy = d;
 						discrepancies++;
@@ -164,8 +168,10 @@ public class CommDriverDS2480B {
 					// t = d ;
 					// id_tx_buf[t/4] = (byte) (id_tx_buf[t/4] | (0x03 << ((t%4)*2)));
 					// busy = true;
-
 				}
+				// we've ended up with one address, discrepancies or otherwise, what is it?
+				System.out.println(String.format("discrepancies %d  path %s", discrepancies, Utils.byteArrayToHexString(path)));
+
 				if (discrepancies == 0) {
 					// only one node
 					String s = Utils.byteArrayToHexString(path);
@@ -204,27 +210,34 @@ public class CommDriverDS2480B {
         	driver = new CommDriverDS2480B(CommPortIdentifier.getPortIdentifier("/dev/ttyUSB0"));
         	
         	double temp = 0;
+        	DateFormat df = new SimpleDateFormat("yyyyMMdd-HHmmss");
+        	PrintWriter pw = new PrintWriter("/home/chris/temps" + df.format(new Date()) + ".csv");
+        	DateFormat precision = new SimpleDateFormat("yyyyMMdd HHmmss");
+        	List<String> devices = new ArrayList<String>();
+        	devices.add("281a2106020000f9");
+        	devices.add("28111606020000d4");
+        	// "28111606020000d4"
+        	// "281a2106020000f9"e
+        	// reads as clash "28100006020000d0ff"
+
+        	driver.DS18B20singleDeviceReadAddress();
+        	
         	while (true) {
-	        	List<String> devices = driver.enumerateBusDevices();
-	
-	        	driver.DS18B20singleDeviceReadAddress();
-	        	
+	        	// List<String> devicesScan = driver.enumerateBusDevices();
+
 	        	for (String device: devices) {
-	        		if (!"281a2106020000f9".equals(device)) throw new RuntimeException("wrong device '" + device + "'");
+	        		// if (!"281a2106020000f9".equals(device)) throw new RuntimeException("wrong device '" + device + "'");
 	        		driver.DS18B20requestConversion(device);
 	        		temp = driver.DS18B20readTemperature(device);
 	        		System.out.println(String.format("TEMPERATURE                              TEMPERATURE %f", temp));
+	        		pw.printf("%s,%s,%d,%8.4f\n", device, precision.format(new Date()), System.currentTimeMillis(), temp);	        		
 	        	}
 	        	
+	        	pw.flush();
 	        	Thread.sleep(1000);
 	        	if (temp > 80.0) break;
         	}
-        	//driver.enumerateBusDevices();
-        	//driver.enumerateBusDevices();
-        	//driver.enumerateBusDevices();
-        	//driver.enumerateBusDevices();
-        	//driver.enumerateBusDevices();
-
+        	
         	
         	System.out.println("finished");
         	
@@ -244,7 +257,7 @@ public class CommDriverDS2480B {
 		
 		sendByte(0xE1); // data mode
 		sendByteCheckedReply(0x33, 0x33); // read rom
-		byte[] address = new byte[9];
+		byte[] address = new byte[8];
 		readByteArrayFully(address, 0xFF);
 		// check CRC (byte 8)
 		
@@ -262,12 +275,12 @@ public class CommDriverDS2480B {
 		System.out.println("Read buffer " + Utils.byteArrayToHexString(address));
 	}
 
-	private void readByteForever() throws IOException {
-		while (true) {
-			sendByte(0xFF);
-			this.input.read();
-		}
-	}
+//	private static readByteForever() throws IOException {
+//		while (true) {
+//			sendByte(0xFF);
+//			this.input.read();
+//		}
+//	}
 
 	private void DS18B20requestConversion(String device) throws IOException {
 		assert(device.length() == 16);
@@ -289,23 +302,19 @@ public class CommDriverDS2480B {
 				sendByteCheckedReply(address[i], 0x00, 0x00);
 		}
 		sendByte(0xE3); // cmd mode
-		sendByteCheckedReply(0xEF, 0xEC, 0xFC); // arm strong pullup, last 2 bits undefined
+		sendByte(0xEF); // arm stirng pullup (not 1s pulse now active)
+		sendByteCheckedReply(0xF1, 0xEC, 0xFC); // arm strong pullup, last 2 bits undefined
 
-		// sendByte(0xF1); // terminate on pulse
-		// reply = input.read();
-		// if (reply != 0x28) throw new RuntimeException("lost sync " + Integer.toHexString(reply));
-		
 		sendByte(0xE1); // data mode
 		sendByteCheckedReply(0x44, 0x44); // convert
 		
 		// read end of pullup code MSB(44)== 0 so expect 76 (76: MSB==0  F6: MSB==1)
-		int reply = input.read();
-		if (reply != 0x76) throw new RuntimeException("lost sync " +Integer.toHexString(reply));
+		readChecked(0x76, 0xFF);
 				
 		sendByte(0xE3); // cmd mode
-		sendByteCheckedReply(0xED, 0xEC, 0xFC); // disable strong pullup, last 2 bits undefined
-		// sendByte(0xF1); // restore terminate on pulse
-		
+		sendByte(0xED); // disable storng pullup
+		sendByteCheckedReply(0xF1, 0xEC, 0xFC); // cancel pulse + pullup reply, last 2 bits undefined
+			
 		sendCheckedReset(Speed.REGULAR);
 		
 	}
@@ -317,7 +326,11 @@ public class CommDriverDS2480B {
 	private int sendByteCheckedReply(int b, int expect, int mask) throws IOException {
 		expect = expect & 0x000000FF;
 		sendByte(b);
-		int reply = input.read();
+		return readChecked(expect, mask);		
+	}
+
+	private int readChecked(int expect, int mask) throws IOException {
+		int reply = this.input.read();
 		int mreply = reply & (mask & 0x000000FF);
 		if (expect != mreply) throw new RuntimeException(String.format("lost sync, expecting %s, reply %s with mask %s was %s",
 					Utils.intsToHexString(expect),
@@ -325,7 +338,7 @@ public class CommDriverDS2480B {
 					Utils.intsToHexString(mask),
 					Utils.intsToHexString(mreply)
 					));
-		return reply;		
+		return reply;
 	}
 
 	private double DS18B20readTemperature(String device) throws IOException {
@@ -354,11 +367,10 @@ public class CommDriverDS2480B {
 		sendByte(0xE3); // cmd mode
 		sendCheckedReset(Speed.REGULAR);
 		
-		int t = scratch[1] + (scratch[0] << 8);
-		System.out.println(t);
-		// System.exit(0);
-		
-		return ((double)t) / 1000.0;
+		ByteBuffer buffer = ByteBuffer.wrap(scratch);
+		buffer.order(ByteOrder.LITTLE_ENDIAN);
+		int traw = buffer.getShort();
+		return ((double)traw) / 16.0;
 		
 	}
 
