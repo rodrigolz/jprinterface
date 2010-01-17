@@ -14,13 +14,17 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
+
+import com.sun.jmx.remote.internal.ArrayQueue;
 
 public class CommDriverDS2480B {
 	
@@ -113,84 +117,99 @@ public class CommDriverDS2480B {
 
     private List<String> enumerateBusDevices() {
     	List<String> devices = new ArrayList<String>();
+    	Queue<byte[]> routes = new ArrayDeque<byte[]>();
+    	{
+    		byte[] route = new byte[8];
+    		Arrays.fill(route, (byte)0x00);
+    		routes.add(route);
+    	}
+    	System.out.println("enumerating bus devices");
     	try {
-    		System.out.println("enumerating bus devices");
-			    		
-    		byte[] id_tx_buf = new byte[16];
-			byte[] id_rx_buf = new byte[16];
-			boolean busy = true;
-			int highestDiscrepancy = -1;
-			Arrays.fill(id_tx_buf, (byte)0x00);
-			while (busy) {
-    			sendCheckedReset(Speed.REGULAR);
-				System.out.println("switch data mode");
-				sendByte(0xE1);
-				System.out.println("search bus");
-				sendByteCheckedReply(0xF0, 0xF0);
-				sendByte(0xE3);
-				sendByte(0xB1);				
-				sendByte(0xE1);
-				System.out.println("sending 16-byte search address");
-				for (int c = 0; c < id_tx_buf.length; c++) {
-					sendByte(id_tx_buf[c]);
-					id_rx_buf[c] = input.readByte();
-				}
-				System.out.println(String.format("sent: %s", Utils.byteArrayToHexString(id_tx_buf)));
-				System.out.println(String.format("recv: %s", Utils.byteArrayToHexString(id_rx_buf)));
+	    	while (routes.size() > 0) {
+	    		byte[] route = routes.remove();
+				byte[][] result = testRoute(route);
+				byte[] path = result[0];
+				byte[] discrepancy = result[1];
 				
-				busy = false;
-				int discrepancies = 0;
-				byte[] path = new byte[8];
-				for (int d = 0; d < 64; d++) {
-					int rd = (id_rx_buf[d/4] >> ((d%4)*2)) & 3;
-					// System.out.println(String.format(" bit %d  reads %d", d, rd));
-					switch (rd) {
-					case 0: // no discrepancy, chose 0
-						break ;
-					case 1: // discrepancy, chose 0
-						System.out.println(String.format("lowest discrepancy bit %d/64", d));
-						if (highestDiscrepancy < d) highestDiscrepancy = d;
-						discrepancies++;
-						break;
-					case 2: 	
-						// no discrepancy, chose 1
-						path[d/8] = (byte) (path[d/8] | 1 << (d % 8));
-						break; 
-					case 3:
-						// discrepancy, chose 1
-						path[d/8] = (byte) (path[d/8] | 1 << (d % 8));
-						System.out.println(String.format("discrepancy at %d", d));
-						if (highestDiscrepancy < d) highestDiscrepancy = d;
-						discrepancies++;
-						break;
-					} 
-					
-					// t = d ;
-					// id_tx_buf[t/4] = (byte) (id_tx_buf[t/4] | (0x03 << ((t%4)*2)));
-					// busy = true;
-				}
 				// we've ended up with one address, discrepancies or otherwise, what is it?
-				System.out.println(String.format("discrepancies %d  path %s", discrepancies, Utils.byteArrayToHexString(path)));
-
-				if (discrepancies == 0) {
-					// only one node
-					String s = Utils.byteArrayToHexString(path);
-					System.out.println(String.format("discrepancies %d  address %s", discrepancies, s));
-					assert(s.length() == 16);
-					devices.add(s);
+				System.out.println(String.format("route %s path %s  discrepancies %s", Utils.byteArrayToHexString(route), Utils.byteArrayToHexString(path), Utils.byteArrayToHexString(discrepancy)));
+	
+				String s = Utils.byteArrayToHexString(path);
+				assert(s.length() == 16);
+				devices.add(s);
+				
+				// each position we have a discrepancy, add the opposite (unexplored)
+				// route to routes. 64 bits to check. We can generate the new
+				// route by inverting corresponding bit in path[]
+				for (int b = 0; b < 64; b++) {
+					int bi = b / 8;
+					int bj = b % 8;
+					boolean bit = ((discrepancy[bi] >> bj) & 0x1) == 1 && 
+								  ((route[bi] >> bj) & 0x1) == 0;
+					if (bit) { 
+						System.out.println(String.format("discrepancy bit %d (%d %d)", b, bi, bj));
+						byte[] newpath = route.clone();
+						newpath[bi] ^= (1 << bj);
+						System.out.println(String.format("  adding route %s  ", Utils.byteArrayToHexString(newpath)));
+						routes.add(newpath);
+					}
+					
 				}
-				
-				sendByte(0xE3);  // command mode
-				sendByte(0xA1);  // search accell off
-				
-			}
+					
+
+	    	}
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 		return devices;
 	}
 
-    private void close() {
+    private byte[][] testRoute(byte[] route) throws IOException {
+    	sendCheckedReset(Speed.REGULAR);
+		System.out.println("switch data mode");
+		sendByte(0xE1);
+		System.out.println("search bus");
+		sendByteCheckedReply(0xF0, 0xF0);
+		sendByte(0xE3);
+		sendByte(0xB1);				
+		sendByte(0xE1);
+		
+		byte[] tx_buf = new byte[16];
+		byte[] rx_buf = new byte[16];
+
+		// initialise tx_buf with route
+		for (int c = 0; c < route.length; c++) {
+			tx_buf[c*2+0] = (byte) ((route[c] & 1) << 1 | (route[c] & 2) << 2 | (route[c] & 4) << 3 | (route[c] & 8) << 4);
+			tx_buf[c*2+1] = (byte) ((route[c] & 16) >> 3| (route[c] & 32) >> 2 | (route[c] & 64) >> 1 | (route[c] & 128) >> 0);
+		}
+				
+		System.out.println("sending 16-byte search address " + Utils.byteArrayToHexString(tx_buf) );
+		for (int c = 0; c < tx_buf.length; c++) {
+			sendByte(tx_buf[c]);
+			rx_buf[c] = input.readByte();
+		}
+		System.out.println(String.format("sent: %s", Utils.byteArrayToHexString(tx_buf)));
+		System.out.println(String.format("recv: %s", Utils.byteArrayToHexString(rx_buf)));
+		
+		byte[] path = new byte[8];
+		byte[] dscp = new byte[8];
+		for (int d = 0; d < 64; d++) {
+			// [ id_rx_buf[0-9] >> (0,2,4,6) ] & 00000011
+			int rd = (rx_buf[d/4] >> ((d%4)*2)) & 3;
+			// bit 0 = discrepancy [0/1]
+			// bit 1 = path taken [0/1]
+			if ((rd & 0x1) == 0x1) dscp[d/8] = (byte) (dscp[d/8] | 1 << (d % 8));
+			if ((rd & 0x2) == 0x2) path[d/8] = (byte) (path[d/8] | 1 << (d % 8));			 
+		}
+		
+		sendByte(0xE3);  // command mode
+		sendByte(0xA1);  // search accell off
+		
+		return new byte[][] { path, dscp }; 
+	}
+
+	private void close() {
 		
     	this.port.close();
 		
@@ -214,16 +233,17 @@ public class CommDriverDS2480B {
         	PrintWriter pw = new PrintWriter("/home/chris/temps" + df.format(new Date()) + ".csv");
         	DateFormat precision = new SimpleDateFormat("yyyyMMdd HHmmss");
         	List<String> devices = new ArrayList<String>();
-        	devices.add("281a2106020000f9");
-        	devices.add("28111606020000d4");
-        	// "28111606020000d4"
-        	// "281a2106020000f9"e
-        	// reads as clash "28100006020000d0ff"
-
-        	driver.DS18B20singleDeviceReadAddress();
+        	//devices.add("281a2106020000f9");
+        	//devices.add("28111606020000d4");
+        	devices.add("f900000206211a28");
+        	devices.add("d400000206161128");
+        	
+        	devices.clear();
+        	// driver.DS18B20singleDeviceReadAddress();
         	
         	while (true) {
-	        	// List<String> devicesScan = driver.enumerateBusDevices();
+	        	List<String> devicesScan = driver.enumerateBusDevices();
+	        	System.out.println(devicesScan);
 
 	        	for (String device: devices) {
 	        		// if (!"281a2106020000f9".equals(device)) throw new RuntimeException("wrong device '" + device + "'");

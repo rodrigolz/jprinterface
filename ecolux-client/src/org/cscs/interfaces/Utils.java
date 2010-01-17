@@ -5,7 +5,7 @@ public class Utils {
 	public static String byteArrayToHexString(byte... path) {
 		
 		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < path.length; i++) {
+		for (int i = path.length - 1; i >= 0; i--) {
 			byte b = path[i];
 			int bi = (b >= 0) ? b : 256+b;
 			String s = Integer.toHexString(bi);
@@ -21,7 +21,7 @@ public class Utils {
 		// expect string length to be multiple of two
 		int len = device.length() / 2;
 		byte[] data = new byte[len];
-		for (int i = 0; i < len; i++) {
+		for (int i = len - 1; i >= 0; i--) {
 			data[i] = (byte) Integer.parseInt(device.substring(i*2, i*2+2), 16);
 		}
 		return data;
@@ -36,6 +36,9 @@ public class Utils {
 		System.out.println(byteArrayToHexString(b));
 		b = (byte) 0xFF;
 		System.out.println(byteArrayToHexString(b));
+		byte[] bs = new byte[] { (byte) 0xFF, 0x00 }; // low byte FF, high byte 00
+		System.out.println(byteArrayToHexString(bs));
+		
 		
 	}
 
