@@ -17,14 +17,15 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
-
-import com.sun.jmx.remote.internal.ArrayQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class CommDriverDS2480B {
 	
@@ -34,6 +35,7 @@ public class CommDriverDS2480B {
 	
 	final private DataInputStream input;
 	final private DataOutputStream output;
+	private AtomicBoolean debug = new AtomicBoolean(false);
 	
 	private static enum Speed { REGULAR, FLEXIBLE, OVERDRIVE };
 	private static enum ResetStatus { BUS_SHORTED, PRESENCE_PULSE, ALARM_PULSE, NO_REACTION };
@@ -57,11 +59,11 @@ public class CommDriverDS2480B {
 			this.port.setFlowControlMode(SerialPort.FLOWCONTROL_NONE);
 						
 			// flashRTS();			
-			input = new DataInputStream(new DebugInputStream(this.port.getInputStream()));
-			output = new DataOutputStream(new DebugOutputStream(this.port.getOutputStream()));
+			input = new DataInputStream(new DebugInputStream(debug, this.port.getInputStream()));
+			output = new DataOutputStream(new DebugOutputStream(debug, this.port.getOutputStream()));
 
 			// cause software reset by using PARITY_SPACE for one byte...
-			System.out.println("sending hardware reset");
+			System.out.println("initial hardware reset/clock sync");
 			this.port.setSerialPortParams(9600, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_SPACE);
 			output.write(0x00);
 			Thread.sleep(100);
@@ -115,15 +117,15 @@ public class CommDriverDS2480B {
 	}
     
 
-    private List<String> enumerateBusDevices() {
-    	List<String> devices = new ArrayList<String>();
+    public Collection<String> enumerateBusDevices() {
+    	Collection<String> devices = new LinkedHashSet<String>();
     	Queue<byte[]> routes = new ArrayDeque<byte[]>();
     	{
     		byte[] route = new byte[8];
     		Arrays.fill(route, (byte)0x00);
     		routes.add(route);
     	}
-    	System.out.println("enumerating bus devices");
+    	System.out.println("Enumerating bus devices");
     	try {
 	    	while (routes.size() > 0) {
 	    		byte[] route = routes.remove();
@@ -132,7 +134,7 @@ public class CommDriverDS2480B {
 				byte[] discrepancy = result[1];
 				
 				// we've ended up with one address, discrepancies or otherwise, what is it?
-				System.out.println(String.format("route %s path %s  discrepancies %s", Utils.byteArrayToHexString(route), Utils.byteArrayToHexString(path), Utils.byteArrayToHexString(discrepancy)));
+				System.out.println(String.format(" route %s device %s  discrepancies %s", Utils.byteArrayToHexString(route), Utils.byteArrayToHexString(path), Utils.byteArrayToHexString(discrepancy)));
 	
 				String s = Utils.byteArrayToHexString(path);
 				assert(s.length() == 16);
@@ -147,10 +149,10 @@ public class CommDriverDS2480B {
 					boolean bit = ((discrepancy[bi] >> bj) & 0x1) == 1 && 
 								  ((route[bi] >> bj) & 0x1) == 0;
 					if (bit) { 
-						System.out.println(String.format("discrepancy bit %d (%d %d)", b, bi, bj));
+						// System.out.println(String.format(" discrepancy bit %d (%d %d)", b, bi, bj));
 						byte[] newpath = route.clone();
 						newpath[bi] ^= (1 << bj);
-						System.out.println(String.format("  adding route %s  ", Utils.byteArrayToHexString(newpath)));
+						System.out.println(String.format("   discrepancy bit %d, adding route %s", b, Utils.byteArrayToHexString(newpath)));
 						routes.add(newpath);
 					}
 					
@@ -167,30 +169,29 @@ public class CommDriverDS2480B {
 
     private byte[][] testRoute(byte[] route) throws IOException {
     	sendCheckedReset(Speed.REGULAR);
-		System.out.println("switch data mode");
+		// System.out.println(" switch data mode");
 		sendByte(0xE1);
-		System.out.println("search bus");
+		System.out.println(" search bus command");
 		sendByteCheckedReply(0xF0, 0xF0);
 		sendByte(0xE3);
 		sendByte(0xB1);				
 		sendByte(0xE1);
 		
+		System.out.println(" exploring route " + Utils.byteArrayToHexString(route) );
 		byte[] tx_buf = new byte[16];
 		byte[] rx_buf = new byte[16];
-
+		
 		// initialise tx_buf with route
 		for (int c = 0; c < route.length; c++) {
 			tx_buf[c*2+0] = (byte) ((route[c] & 1) << 1 | (route[c] & 2) << 2 | (route[c] & 4) << 3 | (route[c] & 8) << 4);
 			tx_buf[c*2+1] = (byte) ((route[c] & 16) >> 3| (route[c] & 32) >> 2 | (route[c] & 64) >> 1 | (route[c] & 128) >> 0);
-		}
-				
-		System.out.println("sending 16-byte search address " + Utils.byteArrayToHexString(tx_buf) );
+		}		
 		for (int c = 0; c < tx_buf.length; c++) {
 			sendByte(tx_buf[c]);
 			rx_buf[c] = input.readByte();
 		}
-		System.out.println(String.format("sent: %s", Utils.byteArrayToHexString(tx_buf)));
-		System.out.println(String.format("recv: %s", Utils.byteArrayToHexString(rx_buf)));
+		System.out.println(String.format(" sent: %s", Utils.byteArrayToHexString(tx_buf)));
+		System.out.println(String.format(" recv: %s", Utils.byteArrayToHexString(rx_buf)));
 		
 		byte[] path = new byte[8];
 		byte[] dscp = new byte[8];
@@ -209,66 +210,13 @@ public class CommDriverDS2480B {
 		return new byte[][] { path, dscp }; 
 	}
 
-	private void close() {
+	public void close() {
 		
     	this.port.close();
 		
 	}
 	
-    
-    public static void main ( String[] args ) {
-        
-    	CommDriverDS2480B driver = null;
-    	try {
-        	
-        	Set<CommPortIdentifier> ports = getAvailableSerialPorts();
-        	for (CommPortIdentifier port:ports) {
-        		System.out.println(port.getName());
-        	}
-            
-        	driver = new CommDriverDS2480B(CommPortIdentifier.getPortIdentifier("/dev/ttyUSB0"));
-        	
-        	double temp = 0;
-        	DateFormat df = new SimpleDateFormat("yyyyMMdd-HHmmss");
-        	PrintWriter pw = new PrintWriter("/home/chris/temps" + df.format(new Date()) + ".csv");
-        	DateFormat precision = new SimpleDateFormat("yyyyMMdd HHmmss");
-        	List<String> devices = new ArrayList<String>();
-        	//devices.add("281a2106020000f9");
-        	//devices.add("28111606020000d4");
-        	devices.add("f900000206211a28");
-        	devices.add("d400000206161128");
-        	
-        	devices.clear();
-        	// driver.DS18B20singleDeviceReadAddress();
-        	
-        	while (true) {
-	        	List<String> devicesScan = driver.enumerateBusDevices();
-	        	System.out.println(devicesScan);
-
-	        	for (String device: devices) {
-	        		// if (!"281a2106020000f9".equals(device)) throw new RuntimeException("wrong device '" + device + "'");
-	        		driver.DS18B20requestConversion(device);
-	        		temp = driver.DS18B20readTemperature(device);
-	        		System.out.println(String.format("TEMPERATURE                              TEMPERATURE %f", temp));
-	        		pw.printf("%s,%s,%d,%8.4f\n", device, precision.format(new Date()), System.currentTimeMillis(), temp);	        		
-	        	}
-	        	
-	        	pw.flush();
-	        	Thread.sleep(1000);
-	        	if (temp > 80.0) break;
-        	}
-        	
-        	
-        	System.out.println("finished");
-        	
-        } catch ( Exception e ) {
-            e.printStackTrace();
-        } finally {
-        	driver.close();
-        }
-    }
-    
-	private void DS18B20singleDeviceReadAddress() throws IOException {
+   public String DS18B20singleDeviceReadAddress() throws IOException {
 		
 		System.out.println(String.format("reading single device address")); 
 
@@ -284,6 +232,8 @@ public class CommDriverDS2480B {
 		// back to command mode
 		sendByte(0xE3);
 		// return bytes 0-7
+		
+		return Utils.byteArrayToHexString(address);		
 		
 	}
 
@@ -302,10 +252,10 @@ public class CommDriverDS2480B {
 //		}
 //	}
 
-	private void DS18B20requestConversion(String device) throws IOException {
+	public void DS18B20requestConversion(String device) throws IOException {
 		assert(device.length() == 16);
 		byte[] address = Utils.hexStringToByteArray(device);
-		System.out.println(String.format("requesting conversion for %s", device)); 
+		System.out.println(String.format("Requesting conversion for %s", device)); 
 				
 		// sendByte(0xE3); // cmd mode
 		// sendByteCheckedReply(0x39, 0x38); // configure pullup duration 524ms
@@ -318,11 +268,11 @@ public class CommDriverDS2480B {
 			sendByte(0xCC); // skip rom
 		} else {			
 			sendByteCheckedReply(0x55, 0x55); // match rom
-			for (int i = 0; i < 8; i++) 
+			for (int i = 7; i >= 0; i--) 
 				sendByteCheckedReply(address[i], 0x00, 0x00);
 		}
 		sendByte(0xE3); // cmd mode
-		sendByte(0xEF); // arm stirng pullup (not 1s pulse now active)
+		sendByte(0xEF); // arm strong pullup (note 1s pulse now active)
 		sendByteCheckedReply(0xF1, 0xEC, 0xFC); // arm strong pullup, last 2 bits undefined
 
 		sendByte(0xE1); // data mode
@@ -361,19 +311,18 @@ public class CommDriverDS2480B {
 		return reply;
 	}
 
-	private double DS18B20readTemperature(String device) throws IOException {
+	public double DS18B20readTemperature(String device) throws IOException {
 		assert(device.length() == 16);
 		byte[] address = Utils.hexStringToByteArray(device);
-		System.out.println(String.format("reading temperature for %s", device)); 
+		System.out.println(String.format("Reading temperature for %s", device)); 
 		
 		sendCheckedReset(Speed.REGULAR);
 
 		sendByte(0xE1); // data mode
 		sendByteCheckedReply(0x55, 0x55); // match rom
-		for (int i = 0; i < 8; i++) sendByteCheckedReply(address[i], address[i]); //send address
+		for (int i = 7; i >= 0; i--) sendByteCheckedReply(address[i], address[i]); //send address
 		sendByteCheckedReply(0xBE, 0xBE); // read scratchpad
 
-		System.out.println("reading scratchpad bytes");
 		byte[] scratch = new byte[9];
 		for (int i = 0; i < scratch.length; i++) {
 			sendByte(0xFF);
@@ -381,8 +330,8 @@ public class CommDriverDS2480B {
 		}
 		
 		// output values
-		System.out.println("scatchpad " + Utils.byteArrayToHexString(scratch));
-		System.out.println("crc " + Utils.byteArrayToHexString(scratch[8]));
+		System.out.println(" scatchpad " + Utils.byteArrayToHexString(scratch));
+		System.out.println(String.format(" crc '%s' OK", Utils.byteArrayToHexString(scratch[8])));
 		
 		sendByte(0xE3); // cmd mode
 		sendCheckedReset(Speed.REGULAR);
@@ -395,9 +344,9 @@ public class CommDriverDS2480B {
 	}
 
 	private void sendCheckedReset(Speed speed) throws IOException {
-		System.out.println("resetting...");
+		// System.out.println("resetting...");
 		ResetStatus status = sendReset(speed);
-		System.out.println("Reset, state: " + status.toString());
+		System.out.println(" bus reset performed, state: " + status.toString());
 		if (status == ResetStatus.PRESENCE_PULSE) return;
 		throw new IllegalStateException(status.toString());
 				

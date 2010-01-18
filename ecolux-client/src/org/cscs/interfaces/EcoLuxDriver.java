@@ -9,19 +9,8 @@ import gnu.io.UnsupportedCommOperationException;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.CharBuffer;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.Enumeration;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class EcoLuxDriver {
 	
@@ -31,6 +20,7 @@ public class EcoLuxDriver {
 	
 	final private DataInputStream input;
 	final private DataOutputStream output;
+	private AtomicBoolean debug = new AtomicBoolean(false);
 	
 	public EcoLuxDriver(CommPortIdentifier identifier) throws PortInUseException {
     
@@ -50,8 +40,8 @@ public class EcoLuxDriver {
 			this.port.setFlowControlMode(SerialPort.FLOWCONTROL_NONE);
 						
 			// hookup debugging streams();			
-			input = new DataInputStream(new DebugInputStream(this.port.getInputStream()));
-			output = new DataOutputStream(new DebugOutputStream(this.port.getOutputStream()));
+			input = new DataInputStream(new DebugInputStream(debug, this.port.getInputStream()));
+			output = new DataOutputStream(new DebugOutputStream(debug, this.port.getOutputStream()));
 
 			sendByteCheckedReply(0x01, 0x02);
 			
@@ -114,13 +104,13 @@ public class EcoLuxDriver {
 
 
 
-	private void readByteArrayFully(byte[] address, int dummy) throws IOException {
-		for (int x = 0; x < address.length; x++) {
-			sendByte(dummy);
-			address[x] = this.input.readByte();
-		}
-		System.out.println("Read buffer " + Utils.byteArrayToHexString(address));
-	}
+//	private void readByteArrayFully(byte[] address, int dummy) throws IOException {
+//		for (int x = 0; x < address.length; x++) {
+//			sendByte(dummy);
+//			address[x] = this.input.readByte();
+//		}
+//		System.out.println("Read buffer " + Utils.byteArrayToHexString(address));
+//	}
 
 	private int sendByteCheckedReply(int b, int expect) throws IOException {
 		return sendByteCheckedReply(b, expect, 0xFF);
