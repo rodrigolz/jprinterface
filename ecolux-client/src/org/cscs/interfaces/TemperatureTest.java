@@ -5,10 +5,8 @@ import gnu.io.CommPortIdentifier;
 import java.io.PrintWriter;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
-import java.util.List;
 import java.util.Set;
 
 public class TemperatureTest {
