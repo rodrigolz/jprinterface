@@ -246,41 +246,59 @@ public class CommDriverDS2480B {
 //		}
 //	}
 
-	public void DS18B20requestConversion(String device) throws IOException {
-		assert(device.length() == 16);
-		byte[] address = Utils.hexStringToByteArray(device);
-		System.out.println(String.format("Requesting conversion for %s", device)); 
-				
-		// sendByte(0xE3); // cmd mode
-		// sendByteCheckedReply(0x39, 0x38); // configure pullup duration 524ms
-		sendByteCheckedReply(0x3B, 0x3A); // configure pullup duration 1048ms
-		
+	public void DS18B20requestConversion(String device) throws IOException, InterruptedException {
 		sendCheckedReset(Speed.REGULAR);
+		// in config mode
+		
+		//sendByteCheckedReply(0x39, 0x38); // configure pullup duration 524ms
+		sendByteCheckedReply(0x3B, 0x3A); // configure pullup duration 1048ms
 		
 		sendByte(0xE1); // data mode
 		if ( device == null) {
-			sendByte(0xCC); // skip rom
+			System.out.println(String.format("Starting conversion for ALL DEVICES", device));
+			sendDataByteCheckedReply(0xCC, 0xCC, 0xFF); // skip rom, no reply
 		} else {			
-			sendByteCheckedReply(0x55, 0x55); // match rom
-			for (int i = 7; i >= 0; i--) 
-				sendByteCheckedReply(address[i], 0x00, 0x00);
+			assert(device.length() == 16);
+			byte[] address = Utils.hexStringToByteArray(device);
+			System.out.println(String.format("Requesting conversion for %s", device)); 
+			
+			sendDataByteCheckedReply(0x55, 0x55, 0xFF); // match rom
+			for (int i = 7; i >= 0; i--) {
+				// Thread.sleep(100);
+				sendDataByteCheckedReply(address[i], 0x00, 0x00);
+			}
 		}
 		sendByte(0xE3); // cmd mode
-		sendByte(0xEF); // arm strong pullup (note 1s pulse now active)
-		sendByteCheckedReply(0xF1, 0xEC, 0xFC); // arm strong pullup, last 2 bits undefined
+		sendByte(0xEF); // arm strong pullup after data bytes (also starts a pulse)
+		// reponse bytes arrives after strong pullup duration is over!
+		// EF 11101111  masked by FC (= 11111100) is 11101100 => EC 
+		// F1 11110001	
+		sendByteCheckedReply(0xF1, 0xEC, 0xFC); // pulse termination, + reply to 'arm pullup', last 2 bits undefined
 
 		sendByte(0xE1); // data mode
-		sendByteCheckedReply(0x44, 0x44); // convert
+		sendDataByteCheckedReply(0x44, 0x44, 0xFF); // convert (followed by strong pulse)
+		// read end of pullup code. We sent 0x44, since MSB(44)== 0 expect 76 (76: MSB==0  F6: MSB==1)
 		
-		// read end of pullup code MSB(44)== 0 so expect 76 (76: MSB==0  F6: MSB==1)
+		Thread.sleep(1000); // prevent read timeout on win32
 		readChecked(0x76, 0xFF);
-				
 		sendByte(0xE3); // cmd mode
-		sendByte(0xED); // disable storng pullup
+		
+		sendByte(0xED); // disable strong pullup
 		sendByteCheckedReply(0xF1, 0xEC, 0xFC); // cancel pulse + pullup reply, last 2 bits undefined
 			
 		sendCheckedReset(Speed.REGULAR);
 		
+	}
+
+	private int sendDataByteCheckedReply(int b, int expect, int mask) throws IOException {
+		expect = expect & 0x000000FF;
+		sendDataByte(b);
+		return readChecked(expect, mask);
+	}
+
+	private void sendDataByte(int i) throws IOException {
+		sendByte(i);
+		if ((i & 0xFF) == 0xE3) sendByte(i);
 	}
 
 	private int sendByteCheckedReply(int b, int expect) throws IOException {
@@ -295,6 +313,7 @@ public class CommDriverDS2480B {
 
 	private int readChecked(int expect, int mask) throws IOException {
 		int reply = this.input.read();
+		if (reply == -1) throw new RuntimeException("descriptor closed");
 		int mreply = reply & (mask & 0x000000FF);
 		if (expect != mreply) throw new RuntimeException(String.format("lost sync, expecting %s, reply %s with mask %s was %s",
 					Utils.intsToHexString(expect),
@@ -313,13 +332,13 @@ public class CommDriverDS2480B {
 		sendCheckedReset(Speed.REGULAR);
 
 		sendByte(0xE1); // data mode
-		sendByteCheckedReply(0x55, 0x55); // match rom
-		for (int i = 7; i >= 0; i--) sendByteCheckedReply(address[i], address[i]); //send address
-		sendByteCheckedReply(0xBE, 0xBE); // read scratchpad
+		sendDataByteCheckedReply(0x55, 0x55, 0xFF); // match rom
+		for (int i = 7; i >= 0; i--) sendDataByteCheckedReply(address[i], address[i], 0xFF); //send address
+		sendDataByteCheckedReply(0xBE, 0xBE, 0xFF); // read scratchpad
 
 		byte[] scratch = new byte[9];
 		for (int i = 0; i < scratch.length; i++) {
-			sendByte(0xFF);
+			sendDataByte(0xFF);
 			scratch[i] = this.input.readByte();
 		}
 		
