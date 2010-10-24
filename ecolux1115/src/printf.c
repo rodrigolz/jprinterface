@@ -22,7 +22,7 @@
  define. If the function should be called something else,
  replace outbyte(c) by your own function call.
  */
-#define putchar(c) outbyte(c)
+#define putchar(c) puts(c)
 
 static void printchar(char **str, int c) {
 	extern int putchar(int c);
@@ -179,18 +179,21 @@ static int print(char **out, int *varg) {
 	return pc;
 }
 
-/* assuming sizeof(void *) == sizeof(int) */
-
-//int printf(const char *format, ...) {
-//
-//	register int *varg = (int *) (&format);
-//	return print(0, varg);
-//
-//}
-
 int sprintf(char *out, const char *format, ...) {
 	register int *varg = (int *) (&format);
 	return print(&out, varg);
+}
+
+static char buf[256];
+int printf(const char *format, ...) {
+	register int *varg = (int *) (&format);
+	char *bufptr = buf;
+	int sz = print(&bufptr, varg);
+	int x = 0;
+	for (x = 0; x < sz; x++) {
+		puts(buf[x]);
+	}
+	return sz;
 }
 
 #ifdef TEST_PRINTF

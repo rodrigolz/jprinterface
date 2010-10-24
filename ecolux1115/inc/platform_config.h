@@ -25,8 +25,8 @@
 /*  #define USB_DISCONNECT                      GPIOC  */
 /* #define USB_DISCONNECT_PIN                  GPIO_Pin_11 */
 #define RCC_APB2Periph_GPIO_DISCONNECT      RCC_APB2Periph_GPIOC
-#define EVAL_COM1_IRQn                      USART1_IRQn
-#define EVAL_COM1 USART1
+#define EVAL_COM1_IRQn                      USART2_IRQn
+#define EVAL_COM1 USART2
 
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */

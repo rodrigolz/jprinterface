@@ -290,7 +290,7 @@ void USART_Config_Default(void)
 
 /*******************************************************************************
 * Function Name  :  USART_Config.
-* Description    :  Configure the EVAL_COM1 according to the linecoding structure.
+* Description    :  Configure the EVAL_COM1 according to the line coding structure.
 * Input          :  None.
 * Return         :  Configuration status
                     TRUE : configuration done with success

@@ -10,6 +10,8 @@
 
 // int printf(const char *format, ...);
 int sprintf(char *out, const char *format, ...);
+int printf(const char *format, ...);
 
 
 #endif /* PRINTF_H_ */
+
