@@ -17,6 +17,10 @@ public class DebugInputStream extends InputStream {
 	@Override
 	public int read() throws IOException {
 		int b = wrapped.read();
+		if ( b == -1) {
+			return b;
+			// throw new IOException("end of stream");
+		}
 		if (debug.get()) {
 			String bs = Integer.toBinaryString(b);
 			String hs = Integer.toHexString(b);

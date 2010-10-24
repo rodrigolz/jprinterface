@@ -20,7 +20,7 @@ public class EcoLuxDriver {
 	
 	final private DataInputStream input;
 	final private DataOutputStream output;
-	private AtomicBoolean debug = new AtomicBoolean(false);
+	private AtomicBoolean debug = new AtomicBoolean(true);
 	
 	public EcoLuxDriver(CommPortIdentifier identifier) throws PortInUseException {
     
@@ -36,14 +36,15 @@ public class EcoLuxDriver {
 			
 		this.port = (SerialPort) unknownPort;
 		try {
-			// this.port.setSerialPortParams(9600,SerialPort.DATABITS_8,SerialPort.STOPBITS_1,SerialPort.PARITY_NONE);
+			this.port.setSerialPortParams(115200,SerialPort.DATABITS_8,SerialPort.STOPBITS_1,SerialPort.PARITY_NONE);
 			this.port.setFlowControlMode(SerialPort.FLOWCONTROL_NONE);
 						
+			AtomicBoolean debugIn = new AtomicBoolean(false);
 			// hookup debugging streams();			
-			input = new DataInputStream(new DebugInputStream(debug, this.port.getInputStream()));
+			input = new DataInputStream(new DebugInputStream(debugIn , this.port.getInputStream()));
 			output = new DataOutputStream(new DebugOutputStream(debug, this.port.getOutputStream()));
 
-			sendByteCheckedReply(0x01, 0x02);
+			// sendByteCheckedReply(0x01, 0x02);
 			
 		} catch (UnsupportedCommOperationException e) {
 			throw new IllegalStateException("port did not accept params", e);
@@ -67,7 +68,7 @@ public class EcoLuxDriver {
     	try {
         	
         	
-        	driver = new EcoLuxDriver(CommPortIdentifier.getPortIdentifier("/dev/ttyACM0"));
+        	driver = new EcoLuxDriver(CommPortIdentifier.getPortIdentifier("/dev/ttyUSB0"));
         	
         	driver.sayHello();
         	        	
@@ -81,8 +82,9 @@ public class EcoLuxDriver {
     }
     
 	private void sayHello() throws IOException {
+		System.out.println("waiting for data...\n");
 		while (true) {
-			String s  = readNullTerminatedString();
+			String s  = readLinefeedTerminatedString();
 			System.out.println(s);
 			
 		}	
@@ -90,19 +92,18 @@ public class EcoLuxDriver {
 	}
 
 
-	private String readNullTerminatedString() throws IOException {
-		CharBuffer cb = CharBuffer.allocate(64);
-		
+	private CharBuffer cb = CharBuffer.allocate(1024);
+	private String readLinefeedTerminatedString() throws IOException {
+		cb.clear();
 		int b;
-		while ((b = this.input.read()) != 13) {
+		while ((b = this.input.read()) > 0) {
+			if (b == 10 || b == 13) break;
 			cb.put((char) b);			
 		}
-		cb.put((char) b);
+		if ( b == -1) throw new IOException("end of stream");
 		cb.flip();
 		return cb.toString();		
 	}
-
-
 
 //	private void readByteArrayFully(byte[] address, int dummy) throws IOException {
 //		for (int x = 0; x < address.length; x++) {

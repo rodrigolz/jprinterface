@@ -24,8 +24,8 @@ public class TemperatureTest {
         	for (CommPortIdentifier port:ports) {
         		System.out.println(port.getName());
         	}
-            // String port = "/dev/ttyUSB0";
-            String port = "COM17";
+            String port = "/dev/ttyUSB0";
+            //String port = "COM17";
         	driver = new CommDriverDS2480B(CommPortIdentifier.getPortIdentifier(port));
         	
         	double temp = 0;
